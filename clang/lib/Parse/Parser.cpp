@@ -2847,3 +2847,39 @@ void BalancedDelimiterTracker::skipToEnd() {
   P.SkipUntil(Close, Parser::StopBeforeMatch);
   consumeClose();
 }
+
+// FVDEBUG
+// Some Helper functions to emit custom diagnostics to speed incremental
+// development Can copy the signature into a block just prior to using it. For
+// e.g
+// {
+//    extern void reportCustomDiag(DiagnosticsEngine &Diags, 
+//                                SourceLocation Loc,
+//                                StringRef MsgStr, 
+//                                DiagnosticsEngine::Level Level);
+//    reportCustomDiag(...);
+//
+
+void reportCustomDiag(DiagnosticsEngine &Diags, SourceLocation Loc,
+                      StringRef MsgStr, DiagnosticsEngine::Level Level) {
+
+  enum { MAX_LEN = 10000 };
+  char msg[MAX_LEN + 1] = {};
+  assert(MsgStr.size() < MAX_LEN);
+  strcpy(msg, MsgStr.data());
+  const unsigned DiagID = Diags.getDiagnosticIDs()->getCustomDiagID(
+      (DiagnosticIDs::Level)Level, MsgStr);
+  // unsigned DiagID = Diags.getCustomDiagID(DiagnosticsEngine::Error,
+  //                                        msg);
+  Diags.Report(Loc, DiagID);
+}
+
+void reportCustomDiagSema(Sema *S, SourceLocation Loc, StringRef MsgStr,
+                          DiagnosticsEngine::Level Level) {
+  reportCustomDiag(S->getDiagnostics(), Loc, MsgStr, Level);
+}
+
+void reportCustomDiagParser(Parser *P, SourceLocation Loc, StringRef MsgStr,
+                            DiagnosticsEngine::Level Level) {
+  reportCustomDiagSema(&P->getActions(), Loc, MsgStr, Level);
+}
