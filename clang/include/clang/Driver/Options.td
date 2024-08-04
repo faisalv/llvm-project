@@ -3445,6 +3445,13 @@ defm relaxed_template_template_args : BoolFOption<"relaxed-template-template-arg
   NegFlag<SetFalse, [], [CC1Option], "Disable">,
   BothFlags<[], [ClangOption], " C++17 relaxed template template argument matching">>;
 
+
+defm injection : BoolFOption<"injection",
+  LangOpts<"Injection">, DefaultFalse,
+  PosFlag<SetTrue, [], [ClangOption, CC1Option],
+          "Enable proposed token injection as described by P3294">,
+  NegFlag<SetFalse>>;
+
 defm reflection : BoolFOption<"reflection",
   LangOpts<"Reflection">, DefaultFalse,
   PosFlag<SetTrue, [], [ClangOption, CC1Option],

@@ -304,6 +304,7 @@ EXTENSION(datasizeof, LangOpts.CPlusPlus)
 
 FEATURE(cxx_abi_relative_vtable, LangOpts.CPlusPlus && LangOpts.RelativeCXXABIVTables)
 
+FEATURE(injection, LangOpts.Injection)
 FEATURE(reflection, LangOpts.Reflection)
 FEATURE(parameter_reflection, LangOpts.ParameterReflection)
 FEATURE(expansion_statements, LangOpts.ExpansionStatements)

@@ -3440,7 +3440,6 @@ static void GeneratePointerAuthArgs(const LangOptions &Opts,
   if (Opts.PointerAuthFunctionTypeDiscrimination)
     GenerateArg(Consumer, OPT_fptrauth_function_pointer_type_discrimination);
 }
-
 static void ParsePointerAuthArgs(LangOptions &Opts, ArgList &Args,
                                  DiagnosticsEngine &Diags) {
   Opts.PointerAuthIntrinsics = Args.hasArg(OPT_fptrauth_intrinsics);
@@ -3939,7 +3938,18 @@ bool CompilerInvocation::ParseLangArgs(LangOptions &Opts, ArgList &Args,
   PARSE_OPTION_WITH_MARSHALLING(Args, Diags, __VA_ARGS__)
 #include "clang/Driver/Options.inc"
 #undef LANG_OPTION_WITH_MARSHALLING
-
+  
+  if (Args.hasArg(OPT_finjection)) {
+    if (!Args.hasArg(OPT_freflection)) {
+    
+      extern void reportCustomDiag(DiagnosticsEngine & Diags,
+                                   SourceLocation Loc, StringRef MsgStr,
+                                   DiagnosticsEngine::Level);
+      reportCustomDiag(Diags, SourceLocation(),
+                       "-finjection implies -freflection", Diags.Warning);
+      Opts.Reflection = 1;
+    }
+  }
   if (const Arg *A = Args.getLastArg(OPT_fcf_protection_EQ)) {
     StringRef Name = A->getValue();
     if (Name == "full" || Name == "branch") {

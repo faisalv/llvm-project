@@ -7363,6 +7363,10 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     }
   }
 
+  // -finjection is off by default, as it is experimental.
+  Args.addOptInFlag(CmdArgs, options::OPT_finjection,
+                    options::OPT_fno_injection);
+
   // -freflection is off by default, as it is experimental.
   Args.addOptInFlag(CmdArgs, options::OPT_freflection,
                     options::OPT_fno_reflection);
