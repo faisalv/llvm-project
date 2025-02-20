@@ -2244,6 +2244,17 @@ bool VarDecl::isInExternCXXContext() const {
   return getLexicalDeclContext()->isExternCXXContext();
 }
 
+bool VarDecl::isLocalVarDecl() const {
+  if (getKind() != Decl::Var && getKind() != Decl::Decomposition)
+    return false;
+  if (const DeclContext *DC = getLexicalDeclContext()) {
+    while (isa<ExpansionStmtDecl>(DC))
+      DC = DC->getParent();
+    return DC->getRedeclContext()->isFunctionOrMethod();
+  }
+  return false;
+}
+
 VarDecl *VarDecl::getCanonicalDecl() { return getFirstDecl(); }
 
 VarDecl::DefinitionKind

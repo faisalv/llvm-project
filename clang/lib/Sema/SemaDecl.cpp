@@ -7224,6 +7224,8 @@ static bool shouldConsiderLinkage(const VarDecl *VD) {
 
   if (isa<RequiresExprBodyDecl>(DC))
     return false;
+  if (isa<ExpansionStmtDecl>(DC))
+    return false;
   llvm_unreachable("Unexpected context");
 }
 

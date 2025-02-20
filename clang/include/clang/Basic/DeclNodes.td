@@ -102,6 +102,7 @@ def Friend : DeclNode<Decl>;
 def FriendTemplate : DeclNode<Decl>;
 def StaticAssert : DeclNode<Decl>;
 def ConstevalBlock : DeclNode<Decl>;
+def ExpansionStmt : DeclNode<Decl>, DeclContext;
 def Block : DeclNode<Decl, "blocks">, DeclContext;
 def Captured : DeclNode<Decl>, DeclContext;
 def Import : DeclNode<Decl>;

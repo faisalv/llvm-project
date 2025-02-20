@@ -409,6 +409,7 @@ public:
   void VisitFriendTemplateDecl(FriendTemplateDecl *D);
   void VisitStaticAssertDecl(StaticAssertDecl *D);
   void VisitConstevalBlockDecl(ConstevalBlockDecl *D);
+  void VisitExpansionStmtDecl(ExpansionStmtDecl *D);
   void VisitBlockDecl(BlockDecl *BD);
   void VisitCapturedDecl(CapturedDecl *CD);
   void VisitEmptyDecl(EmptyDecl *D);
@@ -2743,6 +2744,12 @@ void ASTDeclReader::VisitConstevalBlockDecl(ConstevalBlockDecl *D) {
   D->EvaluatingExpr = Record.readExpr();
 }
 
+void ASTDeclReader::VisitExpansionStmtDecl(ExpansionStmtDecl *D) {
+  VisitDecl(D);
+  D->Expansion = cast<CXXExpansionStmt>(Record.readStmt());
+  D->TParams = Record.readTemplateParameterList();
+}
+
 void ASTDeclReader::VisitEmptyDecl(EmptyDecl *D) {
   VisitDecl(D);
 }
@@ -4015,6 +4022,9 @@ Decl *ASTReader::ReadDeclRecord(GlobalDeclID ID) {
     break;
   case DECL_CONSTEVAL_BLOCK:
     D = ConstevalBlockDecl::CreateDeserialized(Context, ID);
+    break;
+  case DECL_EXPANSION_STMT:
+    D = ExpansionStmtDecl::CreateDeserialized(Context, ID);
     break;
   case DECL_OBJC_METHOD:
     D = ObjCMethodDecl::CreateDeserialized(Context, ID);

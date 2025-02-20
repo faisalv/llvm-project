@@ -1042,18 +1042,21 @@ ExprDependence clang::computeDependence(CXXExpansionInitListExpr *E) {
 }
 
 ExprDependence clang::computeDependence(CXXExpansionInitListSelectExpr *E) {
-  auto D = E->getRange()->getDependence() | E->getIdx()->getDependence();
-  if (D & ExprDependence::Value)
-    D |= ExprDependence::Type;
-  return D;
+  return ExprDependence::Type | ExprDependence::Value;
 }
 
-ExprDependence clang::computeDependence(
-        CXXDestructurableExpansionSelectExpr *E) {
-  auto D = E->getRange()->getDependence() | E->getIdx()->getDependence();
-  if (D & ExprDependence::Value)
-    D |= ExprDependence::Type;
-  return D;
+ExprDependence
+clang::computeDependence(CXXIndeterminateExpansionSelectExpr *E) {
+  return ExprDependence::Type | ExprDependence::Value;
+}
+
+ExprDependence clang::computeDependence(CXXIterableExpansionSelectExpr *E) {
+  return ExprDependence::Type | ExprDependence::Value;
+}
+
+ExprDependence
+clang::computeDependence(CXXDestructurableExpansionSelectExpr *E) {
+  return ExprDependence::Type | ExprDependence::Value;
 }
 
 ExprDependence clang::computeDependence(ObjCArrayLiteral *E) {

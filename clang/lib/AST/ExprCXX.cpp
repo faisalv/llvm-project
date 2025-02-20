@@ -2134,6 +2134,65 @@ CXXExpansionInitListExpr *CXXExpansionInitListExpr::Create(
                                           LBraceLoc, RBraceLoc);
 }
 
+CXXIndeterminateExpansionSelectExpr::CXXIndeterminateExpansionSelectExpr(
+        QualType ResultTy, Expr *Range, Expr *Idx, bool Constexpr,
+        unsigned NumLifetimeExtendTemps,
+        MaterializeTemporaryExpr **LifetimeExtendTemps)
+    : Expr(CXXIndeterminateExpansionSelectExprClass, ResultTy, VK_PRValue,
+           OK_Ordinary),
+      SubExprs{Range, Idx}, Constexpr(Constexpr),
+      NumLifetimeExtendTemps(NumLifetimeExtendTemps),
+      LifetimeExtendTemps(LifetimeExtendTemps) {
+  setDependence(computeDependence(this));
+}
+
+CXXIndeterminateExpansionSelectExpr *
+CXXIndeterminateExpansionSelectExpr::Create(
+        const ASTContext &C, Expr *Range, Expr *Idx, bool Constexpr,
+        ArrayRef<MaterializeTemporaryExpr *> LifetimeExtendTemps) {
+  auto **temps = new (C) MaterializeTemporaryExpr *[LifetimeExtendTemps.size()];
+  std::copy(LifetimeExtendTemps.begin(), LifetimeExtendTemps.end(), temps);
+
+  return new (C) CXXIndeterminateExpansionSelectExpr(
+      C.DependentTy, Range, Idx, Constexpr, LifetimeExtendTemps.size(), temps);
+}
+
+ArrayRef<MaterializeTemporaryExpr *>
+CXXIndeterminateExpansionSelectExpr::getLifetimeExtendTemps() const {
+  return ArrayRef<MaterializeTemporaryExpr *>(LifetimeExtendTemps,
+                                              NumLifetimeExtendTemps);
+}
+
+CXXIterableExpansionSelectExpr::CXXIterableExpansionSelectExpr(
+        QualType ResultTy, VarDecl *RangeVar, Expr *Impl)
+    : Expr(CXXIterableExpansionSelectExprClass, ResultTy, VK_PRValue,
+           OK_Ordinary),
+      ImplExpr(Impl), RangeVar(RangeVar) {
+  setDependence(computeDependence(this));
+}
+
+CXXIterableExpansionSelectExpr *
+CXXIterableExpansionSelectExpr::Create(const ASTContext &C, VarDecl *RangeVar,
+                                       Expr *Impl) {
+  return new (C) CXXIterableExpansionSelectExpr(C.DependentTy, RangeVar, Impl);
+}
+
+CXXDestructurableExpansionSelectExpr::CXXDestructurableExpansionSelectExpr(
+        QualType ResultTy, DecompositionDecl *DD, Expr *Idx, bool IsConstexpr)
+    : Expr(CXXDestructurableExpansionSelectExprClass, ResultTy, VK_PRValue,
+           OK_Ordinary),
+      IdxExpr(Idx), DD(DD), IsConstexpr(IsConstexpr) {
+  setDependence(computeDependence(this));
+}
+
+CXXDestructurableExpansionSelectExpr *
+CXXDestructurableExpansionSelectExpr::Create(const ASTContext &C,
+                                             DecompositionDecl *DD, Expr *Idx,
+                                             bool IsConstexpr) {
+  return new (C) CXXDestructurableExpansionSelectExpr(C.DependentTy, DD, Idx,
+                                                      IsConstexpr);
+}
+
 CXXExpansionInitListSelectExpr::CXXExpansionInitListSelectExpr(
         QualType ResultTy, Expr *Range, Expr *Idx)
     : Expr(CXXExpansionInitListSelectExprClass, ResultTy, VK_PRValue,
@@ -2146,23 +2205,6 @@ CXXExpansionInitListSelectExpr *
 CXXExpansionInitListSelectExpr::Create(const ASTContext &C, Expr *Range,
                                        Expr *Idx) {
   return new (C) CXXExpansionInitListSelectExpr(C.DependentTy, Range, Idx);
-}
-
-CXXDestructurableExpansionSelectExpr::CXXDestructurableExpansionSelectExpr(
-        QualType ResultTy, Expr *Range, DecompositionDecl *DD, Expr *Idx,
-        bool IsConstexpr)
-    : Expr(CXXDestructurableExpansionSelectExprClass, ResultTy, VK_PRValue,
-           OK_Ordinary),
-      SubExprs{Range, Idx}, DD(DD), IsConstexpr(IsConstexpr) {
-  setDependence(computeDependence(this));
-}
-
-CXXDestructurableExpansionSelectExpr *
-CXXDestructurableExpansionSelectExpr::Create(const ASTContext &C, Expr *Range,
-                                             DecompositionDecl *DD, Expr *Idx,
-                                             bool IsConstexpr) {
-  return new (C) CXXDestructurableExpansionSelectExpr(C.DependentTy, Range, DD,
-                                                      Idx, IsConstexpr);
 }
 
 CUDAKernelCallExpr::CUDAKernelCallExpr(Expr *Fn, CallExpr *Config,

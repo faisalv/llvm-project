@@ -1614,6 +1614,28 @@ Decl *TemplateDeclInstantiator::VisitConstevalBlockDecl(ConstevalBlockDecl *D) {
        D->getLocation(), InstantiatedEvaluatingExpr.get());
 }
 
+Decl *TemplateDeclInstantiator::VisitExpansionStmtDecl(ExpansionStmtDecl *D) {
+  Decl *NTTP = VisitNonTypeTemplateParmDecl(D->getTemplateParm()); 
+
+  ExpansionStmtDecl *Result =
+      cast<ExpansionStmtDecl>(
+          SemaRef.BuildExpansionStmtDeclaration(
+              D->getBeginLoc(), cast<NonTypeTemplateParmDecl>(NTTP)));
+  CXXExpansionStmt *OldStmt = D->getStmt();
+  assert(Result && OldStmt);
+
+  // Enter the scope of this instantiation. We don't use
+  // PushDeclContext because we don't have a scope.
+  Sema::ContextRAII savedContext(SemaRef, Result, /*NewThis=*/false);
+
+  StmtResult SR = SemaRef.SubstStmt(OldStmt, TemplateArgs);
+  if (SR.isInvalid())
+    return nullptr;
+  Result->setStmt(cast<CXXExpansionStmt>(SR.get()));
+
+  return Result;
+}
+
 Decl *TemplateDeclInstantiator::VisitEnumDecl(EnumDecl *D) {
   EnumDecl *PrevDecl = nullptr;
   if (EnumDecl *PatternPrev = getPreviousDeclForInstantiation(D)) {
@@ -6265,10 +6287,12 @@ NamedDecl *Sema::FindInstantiatedDecl(SourceLocation Loc, NamedDecl *D,
   //    whose type is not instantiation dependent, do nothing to the decl
   //  - otherwise find its instantiated decl.
   if (isa<ParmVarDecl>(D) && !ParentDependsOnArgs) {
-      if (!cast<ParmVarDecl>(D)->getType()->isInstantiationDependentType() ||
-          SemaRef.CodeSynthesisContexts.back().Kind ==
-                CodeSynthesisContext::ExpansionStmtInstantiation)
-        return D;
+    QualType Ty = cast<ParmVarDecl>(D)->getType();
+    if (!Ty->isInstantiationDependentType())
+      return D;
+    if (auto *TTPT = dyn_cast<TemplateTypeParmType>(Ty);
+        TTPT && TTPT->getDepth() < TemplateArgs.getNumRetainedOuterLevels())
+      return D;
   }
   if (isa<ParmVarDecl>(D) || isa<NonTypeTemplateParmDecl>(D) ||
       isa<TemplateTypeParmDecl>(D) || isa<TemplateTemplateParmDecl>(D) ||

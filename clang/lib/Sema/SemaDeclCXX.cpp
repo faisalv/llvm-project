@@ -1939,6 +1939,7 @@ static bool CheckConstexprDeclStmt(Sema &SemaRef, const FunctionDecl *Dcl,
     case Decl::UnresolvedUsingTypename:
     case Decl::UnresolvedUsingValue:
     case Decl::UsingEnum:
+    case Decl::ExpansionStmt:
       //   - static_assert-declarations
       //   - using-declarations,
       //   - using-directives,
@@ -2273,6 +2274,8 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
       return false;
     return true;
 
+  case Stmt::CXXIndeterminateExpansionStmtClass:
+  case Stmt::CXXIterableExpansionStmtClass:
   case Stmt::CXXDestructurableExpansionStmtClass:
   case Stmt::CXXInitListExpansionStmtClass: {
     CXXExpansionStmt *CS = cast<CXXExpansionStmt>(S);
@@ -2283,12 +2286,14 @@ CheckConstexprFunctionStmt(Sema &SemaRef, const FunctionDecl *Dcl, Stmt *S,
                                       Cxx2aLoc, Cxx2bLoc, Kind))
         return false;
 
-    for (size_t Idx = 0; Idx < CS->getNumInstantiations(); ++Idx) {
-      Stmt *Expansion = CS->getInstantiation(Idx);
-      if (!Expansion) break;  // statements not instantiated yet.
-      if (!CheckConstexprFunctionStmt(SemaRef, Dcl, Expansion, ReturnStmts,
-                                      Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
-        return false;
+    if (!CS->hasDependentSize()) {
+      for (size_t Idx = 0; Idx < CS->getNumInstantiations(); ++Idx) {
+        Stmt *Expansion = CS->getInstantiation(Idx);
+        if (!Expansion) break;  // statements not instantiated yet.
+        if (!CheckConstexprFunctionStmt(SemaRef, Dcl, Expansion, ReturnStmts,
+                                        Cxx1yLoc, Cxx2aLoc, Cxx2bLoc, Kind))
+          return false;
+      }
     }
     return true;
   }

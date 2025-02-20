@@ -45,7 +45,8 @@ using namespace clang;
 namespace {
 
 static bool isLocalContainerContext(const DeclContext *DC) {
-  return isa<FunctionDecl>(DC) || isa<ObjCMethodDecl>(DC) || isa<BlockDecl>(DC);
+  return isa<FunctionDecl>(DC) || isa<ObjCMethodDecl>(DC) ||
+         isa<BlockDecl>(DC) || isa<ExpansionStmtDecl>(DC);
 }
 
 static const FunctionDecl *getStructor(const FunctionDecl *fn) {
@@ -1879,6 +1880,8 @@ static GlobalDecl getParentOfLocalEntity(const DeclContext *DC) {
     GD = GlobalDecl(CD, Ctor_Complete);
   else if (auto *DD = dyn_cast<CXXDestructorDecl>(DC))
     GD = GlobalDecl(DD, Dtor_Complete);
+  else if (isa<ExpansionStmtDecl>(DC))
+    GD = getParentOfLocalEntity(DC->getParent());
   else
     GD = GlobalDecl(cast<FunctionDecl>(DC));
   return GD;
@@ -1895,6 +1898,7 @@ void CXXNameMangler::mangleLocalName(GlobalDecl GD,
   assert(isa<NamedDecl>(D) || isa<BlockDecl>(D));
   const RecordDecl *RD = GetLocalClassDecl(D);
   const DeclContext *DC = Context.getEffectiveDeclContext(RD ? RD : D);
+
 
   Out << 'Z';
 
@@ -2244,6 +2248,9 @@ void CXXNameMangler::manglePrefix(const DeclContext *DC, bool NoFunction) {
     return;
 
   if (NoFunction && isLocalContainerContext(DC))
+    return;
+
+  if (isa<ExpansionStmtDecl>(DC))
     return;
 
   const NamedDecl *ND = cast<NamedDecl>(DC);
@@ -5047,8 +5054,10 @@ recurse:
   case Expr::ExtractLValueExprClass:
   case Expr::PackIndexingExprClass:
   case Expr::CXXExpansionInitListExprClass:
-  case Expr::CXXExpansionInitListSelectExprClass:
+  case Expr::CXXIndeterminateExpansionSelectExprClass:
+  case Expr::CXXIterableExpansionSelectExprClass:
   case Expr::CXXDestructurableExpansionSelectExprClass:
+  case Expr::CXXExpansionInitListSelectExprClass:
     llvm_unreachable("unexpected statement kind");
 
   case Expr::CXXReflectExprClass: {

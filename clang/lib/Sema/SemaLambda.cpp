@@ -65,6 +65,13 @@ using namespace sema;
 /// lambda which is capture-ready.  If the return value evaluates to 'false'
 /// then no lambda is capture-ready for \p VarToCapture.
 
+static DeclContext *ignoreExpansionStmts(DeclContext *DC) {
+  while (isa<ExpansionStmtDecl>(DC))
+    DC = DC->getParent();
+
+  return DC;
+}
+
 static inline std::optional<unsigned>
 getStackIndexOfNearestEnclosingCaptureReadyLambda(
     ArrayRef<const clang::sema::FunctionScopeInfo *> FunctionScopes,
@@ -100,7 +107,8 @@ getStackIndexOfNearestEnclosingCaptureReadyLambda(
     // arrived here) - so we don't yet have a lambda that can capture the
     // variable.
     if (IsCapturingVariable &&
-        VarToCapture->getDeclContext()->Equals(EnclosingDC))
+        ignoreExpansionStmts(VarToCapture->getDeclContext())->Equals(
+            EnclosingDC))
       return NoLambdaIsCaptureReady;
 
     // For an enclosing lambda to be capture ready for an entity, all
@@ -125,7 +133,8 @@ getStackIndexOfNearestEnclosingCaptureReadyLambda(
       if (IsCapturingThis && !LSI->isCXXThisCaptured())
         return NoLambdaIsCaptureReady;
     }
-    EnclosingDC = getLambdaAwareParentOfDeclContext(EnclosingDC);
+    EnclosingDC = ignoreExpansionStmts(
+            getLambdaAwareParentOfDeclContext(EnclosingDC));
 
     assert(CurScopeIndex);
     --CurScopeIndex;
@@ -250,7 +259,8 @@ Sema::createLambdaClosureType(SourceRange IntroducerRange, TypeSourceInfo *Info,
                               unsigned LambdaDependencyKind,
                               LambdaCaptureDefault CaptureDefault) {
   DeclContext *DC = CurContext;
-  while (!(DC->isFunctionOrMethod() || DC->isRecord() || DC->isFileContext()))
+  while (!(DC->isFunctionOrMethod() || DC->isRecord() || DC->isFileContext() ||
+           isa<ExpansionStmtDecl>(DC)))
     DC = DC->getParent();
 
   bool IsGenericLambda =
@@ -1354,8 +1364,12 @@ void Sema::ActOnLambdaClosureQualifiers(LambdaIntroducer &Intro,
   // For DR1632, we also allow a capture-default in any context where we can
   // odr-use 'this' (in particular, in a default initializer for a non-static
   // data member).
+  DeclContext *Parent = LSI->Lambda->getParent();
+  while (isa<ExpansionStmtDecl>(Parent))
+    Parent = Parent->getParent();
+  
   if (Intro.Default != LCD_None &&
-      !LSI->Lambda->getParent()->isFunctionOrMethod() &&
+      !Parent->isFunctionOrMethod() &&
       (getCurrentThisType().isNull() ||
        CheckCXXThisCapture(SourceLocation(), /*Explicit=*/true,
                            /*BuildAndDiagnose=*/false)))
@@ -2405,8 +2419,10 @@ Sema::LambdaScopeForCallOperatorInstantiationRAII::
       ParentInstantiations;
   while (true) {
     FDPattern =
-        dyn_cast<FunctionDecl>(getLambdaAwareParentOfDeclContext(FDPattern));
-    FD = dyn_cast<FunctionDecl>(getLambdaAwareParentOfDeclContext(FD));
+        dyn_cast<FunctionDecl>(
+            ignoreExpansionStmts(getLambdaAwareParentOfDeclContext(FDPattern)));
+    FD = dyn_cast<FunctionDecl>(
+            ignoreExpansionStmts(getLambdaAwareParentOfDeclContext(FD)));
 
     if (!FDPattern || !FD)
       break;

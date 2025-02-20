@@ -3468,6 +3468,13 @@ static bool HandleLValueVectorElement(EvalInfo &Info, const Expr *E,
   return true;
 }
 
+static const DeclContext *skipExpansionStmts(const DeclContext *DC) {
+  while (isa<ExpansionStmtDecl>(DC))
+    DC = DC->getParent();
+
+  return DC;
+}
+
 /// Try to evaluate the initializer for a variable declaration.
 ///
 /// \param Info   Information about the ongoing evaluation.
@@ -3493,8 +3500,9 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
       // not declared within the call operator are captures and during checking
       // of a potential constant expression, assume they are unknown constant
       // expressions.
+      const DeclContext *VarCtx = skipExpansionStmts(VD->getDeclContext());
       assert(isLambdaCallOperator(Frame->Callee) &&
-             (VD->getDeclContext() != Frame->Callee || VD->isInitCapture()) &&
+             (VarCtx != Frame->Callee || VD->isInitCapture()) &&
              "missing value for local variable");
       if (Info.checkingPotentialConstantExpression())
         return false;
@@ -3517,9 +3525,10 @@ static bool evaluateVarDeclInit(EvalInfo &Info, const Expr *E,
   if (isa<ParmVarDecl>(VD)) {
     // Assume parameters of a potential constant expression are usable in
     // constant expressions.
+    const DeclContext *VarCtx = skipExpansionStmts(VD->getDeclContext());
     if (!Info.checkingPotentialConstantExpression() ||
         !Info.CurrentCall->Callee ||
-        !Info.CurrentCall->Callee->Equals(VD->getDeclContext())) {
+        !Info.CurrentCall->Callee->Equals(VarCtx)) {
       if (Info.getLangOpts().CPlusPlus11) {
         Info.FFDiag(E, diag::note_constexpr_function_param_value_unknown)
             << VD;
@@ -5520,6 +5529,10 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       const VarDecl *VD = dyn_cast_or_null<VarDecl>(D);
       if (VD && !CheckLocalVariableDeclaration(Info, VD))
         return ESR_Failed;
+
+      if (const ExpansionStmtDecl *ESD = dyn_cast<ExpansionStmtDecl>(D))
+        return EvaluateStmt(Result, Info, ESD->getStmt(), Case);
+
       // Each declaration initialization is its own full-expression.
       FullExpressionRAII Scope(Info);
       if (!EvaluateDecl(Info, D) && !Info.noteFailure())
@@ -5832,6 +5845,7 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
     // Evaluate try blocks by evaluating all sub statements.
     return EvaluateStmt(Result, Info, cast<CXXTryStmt>(S)->getTryBlock(), Case);
 
+  case Stmt::CXXIterableExpansionStmtClass:
   case Stmt::CXXDestructurableExpansionStmtClass:
   case Stmt::CXXInitListExpansionStmtClass: {
     const CXXExpansionStmt *ES = cast<CXXExpansionStmt>(S);
@@ -5847,33 +5861,40 @@ static EvalStmtResult EvaluateStmt(StmtResult &Result, EvalInfo &Info,
       }
     }
 
-    if (auto *DS = cast<DeclStmt>(ES->getExpansionVarStmt()))
-      if (auto *VD = cast<VarDecl>(DS->getSingleDecl()))
-        if (auto *ESE = dyn_cast<CXXDestructurableExpansionSelectExpr>(
-                                                                 VD->getInit()))
-          if (auto *DD = ESE->getDecompositionDecl())
-            EvaluateVarDecl(Info, DD);
+    {
+      const Expr *Select = ES->getExpansionVariable()->getInit();
+      while (const auto *WithCleanups = dyn_cast<ExprWithCleanups>(Select))
+        Select = WithCleanups->getSubExpr();
 
-    bool Continue = true;
-    for (size_t Idx = 0; Continue && Idx < ES->getNumInstantiations(); ++Idx) {
-      Stmt *Expansion = ES->getInstantiation(Idx);
-      assert(Expansion && "missing expansion");
-
-      ESR = EvaluateLoopBody(Result, Info, Expansion);
-      switch (ESR) {
-      case ESR_Break:
-        Continue = false;
-        break;
-      case ESR_Failed:
-      case ESR_Returned:
-      case ESR_CaseNotFound:
-        return ESR;
-      case ESR_Succeeded:
-      case ESR_Continue:
-        break;
+      if (auto *IS = dyn_cast<CXXIterableExpansionSelectExpr>(Select)) {
+        EvaluateVarDecl(Info, IS->getRangeVar());
+      } else if (auto *DS = dyn_cast<CXXDestructurableExpansionSelectExpr>(Select)) {
+        EvaluateVarDecl(Info, DS->getDecompositionDecl());
       }
     }
 
+    bool Continue = true;
+    if (!ES->hasDependentSize()) {
+      for (size_t Idx = 0; Continue && Idx < ES->getNumInstantiations();
+           ++Idx) {
+        Stmt *Expansion = ES->getInstantiation(Idx);
+        assert(Expansion && "missing expansion");
+
+        ESR = EvaluateLoopBody(Result, Info, Expansion);
+        switch (ESR) {
+        case ESR_Break:
+          Continue = false;
+          break;
+        case ESR_Failed:
+        case ESR_Returned:
+        case ESR_CaseNotFound:
+          return ESR;
+        case ESR_Succeeded:
+        case ESR_Continue:
+          break;
+        }
+      }
+    }
     return Scope.destroy() ? ESR_Succeeded : ESR_Failed;
   }
   }
@@ -8991,7 +9012,6 @@ bool LValueExprEvaluator::VisitDeclRefExpr(const DeclRefExpr *E) {
 
 
 bool LValueExprEvaluator::VisitVarDecl(const Expr *E, const VarDecl *VD) {
-
   // If we are within a lambda's call operator, check whether the 'VD' referred
   // to within 'E' actually represents a lambda-capture that maps to a
   // data-member/field within the closure object, and if so, evaluate to the
@@ -9023,7 +9043,8 @@ bool LValueExprEvaluator::VisitVarDecl(const Expr *E, const VarDecl *VD) {
     // variable) or be ill-formed (and trigger an appropriate evaluation
     // diagnostic)).
     CallStackFrame *CurrFrame = Info.CurrentCall;
-    if (CurrFrame->Callee && CurrFrame->Callee->Equals(VD->getDeclContext())) {
+    const DeclContext *VarCtx = skipExpansionStmts(VD->getDeclContext());
+    if (CurrFrame->Callee && CurrFrame->Callee->Equals(VarCtx)) {
       // Function parameters are stored in some caller's frame. (Usually the
       // immediate caller, but for an inherited constructor they may be more
       // distant.)
@@ -17482,9 +17503,11 @@ static ICEDiag CheckICE(const Expr* E, const ASTContext &Ctx) {
   case Expr::CXXSpliceExprClass:
   case Expr::StackLocationExprClass:
   case Expr::ExtractLValueExprClass:
-  case Expr::CXXExpansionInitListExprClass:
-  case Expr::CXXExpansionInitListSelectExprClass:
+  case Expr::CXXIterableExpansionSelectExprClass:
   case Expr::CXXDestructurableExpansionSelectExprClass:
+  case Expr::CXXIndeterminateExpansionSelectExprClass:
+  case Expr::CXXExpansionInitListSelectExprClass:
+  case Expr::CXXExpansionInitListExprClass:
     return NoDiag();
   case Expr::CallExprClass:
   case Expr::CXXOperatorCallExprClass: {

@@ -19,6 +19,7 @@
 #include "clang/AST/ExprCXX.h"
 #include "clang/AST/ExternalASTSource.h"
 #include "clang/AST/ODRHash.h"
+#include "clang/AST/Stmt.h"
 #include "clang/AST/TemplateBase.h"
 #include "clang/AST/TemplateName.h"
 #include "clang/AST/Type.h"
@@ -1761,6 +1762,31 @@ void TemplateParamObjectDecl::printAsInit(llvm::raw_ostream &OS,
   getValue().printPretty(OS, Policy, getType(), &getASTContext());
 }
 
+ExpansionStmtDecl::ExpansionStmtDecl(DeclContext *DC, SourceLocation Loc,
+                                     CXXExpansionStmt *Expansion,
+                                     TemplateParameterList *TParams)
+    : Decl(ExpansionStmt, DC, Loc),
+      DeclContext(ExpansionStmt), Expansion(Expansion), TParams(TParams) { }
+
+void ExpansionStmtDecl::anchor() {}
+
+ExpansionStmtDecl *ExpansionStmtDecl::Create(ASTContext &C, DeclContext *DC,
+                                             SourceLocation Loc,
+                                             CXXExpansionStmt *Expansion,
+                                             TemplateParameterList *TParams) {
+  return new (C, DC) ExpansionStmtDecl(DC, Loc, Expansion, TParams);
+}
+
+ExpansionStmtDecl *ExpansionStmtDecl::CreateDeserialized(ASTContext &C,
+                                                         GlobalDeclID ID) {
+  return new (C, ID) ExpansionStmtDecl(nullptr, SourceLocation(), nullptr,
+                                       nullptr);
+}
+
+SourceRange ExpansionStmtDecl::getSourceRange() const {
+  return Expansion ? Expansion->getSourceRange() : SourceRange();
+}
+
 TemplateParameterList *clang::getReplacedTemplateParameterList(Decl *D) {
   switch (D->getKind()) {
   case Decl::Kind::CXXRecord:
@@ -1813,6 +1839,8 @@ TemplateParameterList *clang::getReplacedTemplateParameterList(Decl *D) {
     return cast<TemplateTemplateParmDecl>(D)->getTemplateParameters();
   case Decl::Kind::Concept:
     return cast<ConceptDecl>(D)->getTemplateParameters();
+  case Decl::Kind::ExpansionStmt:
+    return cast<ExpansionStmtDecl>(D)->getTemplateParameters();
   default:
     llvm_unreachable("Unhandled templated declaration kind");
   }

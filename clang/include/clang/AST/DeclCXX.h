@@ -4463,7 +4463,7 @@ public:
                                     Expr *EvaluatingExpr);
   static ConstevalBlockDecl *CreateDeserialized(ASTContext &C, GlobalDeclID ID);
 
-  Expr *getEvaluatingExpr() { return EvaluatingExpr; }
+  Expr *getEvaluatingExpr() const { return EvaluatingExpr; }
 
   SourceRange getSourceRange() const override LLVM_READONLY {
     return SourceRange(getLocation(), EvaluatingExpr->getEndLoc());

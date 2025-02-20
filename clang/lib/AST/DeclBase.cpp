@@ -28,6 +28,7 @@
 #include "clang/AST/DependentDiagnostic.h"
 #include "clang/AST/ExternalASTSource.h"
 #include "clang/AST/Stmt.h"
+#include "clang/AST/StmtCXX.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LLVM.h"
@@ -299,6 +300,9 @@ unsigned Decl::getTemplateDepth() const {
 
   if (auto *TPL = getDescribedTemplateParams())
     return TPL->getDepth() + 1;
+
+  if (auto *Exp = dyn_cast<ExpansionStmtDecl>(this))
+    return Exp->getTemplateParm()->getDepth() + 1;
 
   // If this is a dependent lambda, there might be an enclosing variable
   // template. In this case, the next step is not the parent DeclContext (or
@@ -957,6 +961,7 @@ unsigned Decl::getIdentifierNamespaceForKind(Kind DeclKind) {
     case TopLevelStmt:
     case StaticAssert:
     case ConstevalBlock:
+    case ExpansionStmt:
     case ObjCPropertyImpl:
     case PragmaComment:
     case PragmaDetectMismatch:
@@ -1342,6 +1347,9 @@ bool DeclContext::isDependentContext() const {
   if (isa<ClassTemplatePartialSpecializationDecl>(this))
     return true;
 
+  if (auto *ESD = dyn_cast<ExpansionStmtDecl>(this))
+    return true;
+
   if (const auto *Record = dyn_cast<CXXRecordDecl>(this)) {
     if (Record->getDescribedClassTemplate())
       return true;
@@ -1436,6 +1444,7 @@ DeclContext *DeclContext::getPrimaryContext() {
   case Decl::OMPDeclareReduction:
   case Decl::OMPDeclareMapper:
   case Decl::RequiresExprBody:
+  case Decl::ExpansionStmt:
     // There is only one DeclContext for these entities.
     return this;
 

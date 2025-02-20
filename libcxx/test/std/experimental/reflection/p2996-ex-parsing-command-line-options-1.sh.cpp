@@ -9,7 +9,8 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++03 || c++11 || c++14 || c++17 || c++20
-// ADDITIONAL_COMPILE_FLAGS: -freflection
+// ADDITIONAL_COMPILE_FLAGS: -freflection -faccess-contexts
+// ADDITIONAL_COMPILE_FLAGS: -fexpansion-statements
 // ADDITIONAL_COMPILE_FLAGS: -Wno-inconsistent-missing-override
 
 // <experimental/reflection>
@@ -26,36 +27,15 @@
 #include <vector>
 
 
-// start 'expand' definition
-namespace __impl {
-  template<auto... vals>
-  struct replicator_type {
-    template<typename F>
-      constexpr void operator>>(F body) const {
-        (body.template operator()<vals>(), ...);
-      }
-  };
-
-  template<auto... vals>
-  replicator_type<vals...> replicator = {};
-}
-
-template<typename R>
-consteval auto expand(R range) {
-  std::vector<std::meta::info> args;
-  for (auto r : range) {
-    args.push_back(std::meta::reflect_value(r));
-  }
-  return substitute(^^__impl::replicator, args);
-}
-// end 'expand' definition
-
-
 template<typename Opts>
 auto parse_options(std::span<std::string_view const> args) -> Opts {
   Opts opts;
 
-  [: expand(nonstatic_data_members_of(^^Opts)) :] >> [&]<auto dm>{
+  using std::meta::access_context;
+  template for (constexpr auto dm :
+                define_static_array(
+                    nonstatic_data_members_of(^^Opts,
+                                              access_context::current()))) {
     auto it = std::find_if(args.begin(), args.end(),
       [](std::string_view arg){
         return arg.starts_with("--") && arg.substr(2) == identifier_of(dm);
@@ -63,7 +43,7 @@ auto parse_options(std::span<std::string_view const> args) -> Opts {
 
     if (it == args.end()) {
       // no option provided, use default
-      return;
+      break;
     } else if (it + 1 == args.end()) {
       std::cerr << "Option " << *it << " is missing a value\n";
       std::exit(EXIT_FAILURE);
@@ -91,6 +71,6 @@ int main(int argc, const char *argv[]) {
 
   // RUN: grep "opts.file=input.txt" %t.stdout
   std::cout << "opts.file=" << opts.file_name << '\n';
-  // RUN: grep "opts.count=42" %t.stdout
+  // RUN: grep "opts.count=1" %t.stdout
   std::cout << "opts.count=" << opts.count << '\n';
 }

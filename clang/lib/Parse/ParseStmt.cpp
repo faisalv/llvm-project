@@ -301,8 +301,31 @@ Retry:
   }
 
   case tok::kw_template: {
-    if (NextToken().is(tok::kw_for))  // C++2c: Expansion statement
-      return ParseForStatement(TrailingElseLoc);
+    if (NextToken().is(tok::kw_for)) {  // C++26: Expansion statement
+      ExpansionStmtDecl *ExpansionDecl =
+          cast<ExpansionStmtDecl>(
+              Actions.ActOnExpansionStmtDeclaration(getCurScope(),
+                                                    Tok.getLocation()));
+      assert(ExpansionDecl && "no ExpansionStmtDecl returned");
+
+      CXXExpansionStmt *Expansion;
+      {
+        Sema::ContextRAII CtxGuard(Actions, ExpansionDecl, /*NewThis=*/false);
+
+        StmtResult SR = ParseForStatement(TrailingElseLoc);
+        if (SR.isInvalid())
+          return SR;
+        Expansion = cast<CXXExpansionStmt>(SR.get());
+        ExpansionDecl->setStmt(Expansion);
+      }
+
+      DeclSpec DS(AttrFactory);
+      DeclGroupPtrTy DeclGroupPtr =
+          Actions.FinalizeDeclaratorGroup(getCurScope(), DS, {ExpansionDecl});
+
+      return Actions.ActOnDeclStmt(DeclGroupPtr, Expansion->getBeginLoc(),
+                                   Expansion->getEndLoc());
+    }
 
     SourceLocation DeclEnd;
     ParsedAttributes Attrs(AttrFactory);
@@ -2043,6 +2066,7 @@ bool Parser::isForRangeIdentifier() {
 /// [C++0x]   braced-init-list            [TODO]
 StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
   SourceLocation TemplateKWLoc;
+  NonTypeTemplateParmDecl *ExpansionStmtTemplateParm = nullptr;
   if (Tok.is(tok::kw_template)) {
     TemplateKWLoc = ConsumeToken();
     if (!getLangOpts().ExpansionStatements) {
@@ -2050,6 +2074,8 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
       SkipUntil(tok::semi);
       return StmtError();
     }
+    ExpansionStmtDecl *ESD = cast<ExpansionStmtDecl>(Actions.CurContext);
+    ExpansionStmtTemplateParm = ESD->getTemplateParm();
   }
 
   assert(Tok.is(tok::kw_for) && "Not a for stmt!");
@@ -2357,12 +2383,13 @@ StmtResult Parser::ParseForStatement(SourceLocation *TrailingElseLoc) {
   if (ForRangeInfo.ParsedForRangeDecl()) {
     ExprResult CorrectedRange =
         Actions.CorrectDelayedTyposInExpr(ForRangeInfo.RangeExpr.get());
-    if (ForRangeInfo.ExpansionStmt) {
+    if (ForRangeInfo.ExpansionStmt)
       ForRangeStmt = Actions.ActOnCXXExpansionStmt(
-        getCurScope(), TemplateKWLoc, ForLoc, T.getOpenLocation(),
+        ExpansionStmtTemplateParm, TemplateKWLoc, ForLoc, T.getOpenLocation(),
         FirstPart.get(), ForRangeInfo.LoopVar.get(), ForRangeInfo.ColonLoc,
-        CorrectedRange.get(), T.getCloseLocation(), Sema::BFRK_Build);
-    } else
+        CorrectedRange.get(), T.getCloseLocation(), Sema::BFRK_Build,
+        ForRangeInfo.LifetimeExtendTemps);
+    else
       ForRangeStmt = Actions.ActOnCXXForRangeStmt(
           getCurScope(), ForLoc, CoawaitLoc, FirstPart.get(),
           ForRangeInfo.LoopVar.get(), ForRangeInfo.ColonLoc,

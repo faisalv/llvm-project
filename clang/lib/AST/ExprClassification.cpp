@@ -226,6 +226,8 @@ static Cl::Kinds ClassifyInternal(ASTContext &Ctx, const Expr *E) {
   case Expr::StackLocationExprClass:
   case Expr::CXXExpansionInitListExprClass:
   case Expr::CXXExpansionInitListSelectExprClass:
+  case Expr::CXXIndeterminateExpansionSelectExprClass:
+  case Expr::CXXIterableExpansionSelectExprClass:
   case Expr::CXXDestructurableExpansionSelectExprClass:
     return Cl::CL_PRValue;
 

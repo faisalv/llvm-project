@@ -202,8 +202,12 @@ void CodeGenFunction::EmitStmt(const Stmt *S, ArrayRef<const Attr *> Attrs) {
   case Stmt::CXXForRangeStmtClass:
     EmitCXXForRangeStmt(cast<CXXForRangeStmt>(*S), Attrs);
     break;
-  case Stmt::CXXInitListExpansionStmtClass:
+  case Stmt::CXXIndeterminateExpansionStmtClass:
+    S->dump();
+    llvm_unreachable("should have been replaced during instantiation");
+  case Stmt::CXXIterableExpansionStmtClass:
   case Stmt::CXXDestructurableExpansionStmtClass:
+  case Stmt::CXXInitListExpansionStmtClass:
     EmitCXXExpansionStmt(cast<CXXExpansionStmt>(*S), Attrs);
     break;
   case Stmt::SEHTryStmtClass:
@@ -1461,18 +1465,27 @@ void CodeGenFunction::EmitCXXExpansionStmt(const CXXExpansionStmt &S,
   if (auto *Init = S.getInit())
     EmitStmt(Init, Attrs);
 
+  {
+    const Expr *Select = S.getExpansionVariable()->getInit();
+    if (auto *WithCleanups = dyn_cast<ExprWithCleanups>(Select))
+      Select = WithCleanups->getSubExpr();
+
+    if (auto *DS = dyn_cast<CXXDestructurableExpansionSelectExpr>(Select)) {
+      auto *DD = DS->getDecompositionDecl();
+      EmitVarDecl(*DD);
+      for (auto *B : DD->bindings())
+        if (auto *H = B->getHoldingVar())
+          EmitVarDecl(*H);
+    } else if (auto *IS = dyn_cast<CXXIterableExpansionSelectExpr>(Select)) {
+      EmitVarDecl(*IS->getRangeVar());
+    }
+  }
+
   SmallVector<JumpDest> Dests;
   for (size_t Idx = 0; Idx < S.getNumInstantiations(); ++Idx) {
     std::string LabelName = llvm::formatv("expand.nxt.{0}", Idx);
     Dests.emplace_back(getJumpDestInCurrentScope(LabelName));
   }
-
-  if (auto *DS = cast<DeclStmt>(S.getExpansionVarStmt()))
-    if (auto *VD = cast<VarDecl>(DS->getSingleDecl()))
-      if (auto *ESE = dyn_cast<CXXDestructurableExpansionSelectExpr>(
-                                                                 VD->getInit()))
-        if (auto *DD = ESE->getDecompositionDecl())
-          EmitVarDecl(*DD);
 
   for (size_t Idx = 0; Idx < S.getNumInstantiations(); ++Idx) {
     const Stmt *Expansion = S.getInstantiation(Idx);
@@ -1482,7 +1495,7 @@ void CodeGenFunction::EmitCXXExpansionStmt(const CXXExpansionStmt &S,
                            Dests[Idx + 1] : ExpandExit;
       BreakContinueStack.push_back(BreakContinue(ExpandExit, Continue));
       {
-        EmitBlock(Dests[Idx].getBlock(), true);
+        EmitBlock(Dests[Idx].getBlock());
         LexicalScope ExpansionScope(*this, Expansion->getSourceRange());
         EmitStmt(Expansion, Attrs);
       }

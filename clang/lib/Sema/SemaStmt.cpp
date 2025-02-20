@@ -3831,8 +3831,9 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
   // RetValExp should determine the deduced type.
   ExprResult RetVal = CorrectDelayedTyposInExpr(
       RetValExp, nullptr, /*RecoverUncorrectedTypos=*/true);
-  if (RetVal.isInvalid())
+  if (RetVal.isInvalid()) {
     return StmtError();
+  }
 
   if (getCurScope()->isInOpenACCComputeConstructScope())
     return StmtError(
@@ -3853,8 +3854,9 @@ Sema::ActOnReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
 
   StmtResult R =
       BuildReturnStmt(ReturnLoc, RetVal.get(), /*AllowRecovery=*/true);
-  if (R.isInvalid() || ExprEvalContexts.back().isDiscardedStatementContext())
+  if (R.isInvalid() || ExprEvalContexts.back().isDiscardedStatementContext()) {
     return R;
+  }
 
   VarDecl *VD =
       const_cast<VarDecl *>(cast<ReturnStmt>(R.get())->getNRVOCandidate());
@@ -3883,8 +3885,9 @@ static bool CheckSimplerImplicitMovesMSVCWorkaround(const Sema &S,
 StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
                                  bool AllowRecovery) {
   // Check for unexpanded parameter packs.
-  if (RetValExp && DiagnoseUnexpandedParameterPack(RetValExp))
+  if (RetValExp && DiagnoseUnexpandedParameterPack(RetValExp)) {
     return StmtError();
+  }
 
   // HACK: We suppress simpler implicit move here in msvc compatibility mode
   // just as a temporary work around, as the MSVC STL has issues with
@@ -3895,9 +3898,10 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
       RetValExp, SupressSimplerImplicitMoves ? SimplerImplicitMoveMode::ForceOff
                                              : SimplerImplicitMoveMode::Normal);
 
-  if (isa<CapturingScopeInfo>(getCurFunction()))
+  if (isa<CapturingScopeInfo>(getCurFunction())) {
     return ActOnCapScopeReturnStmt(ReturnLoc, RetValExp, NRInfo,
                                    SupressSimplerImplicitMoves);
+  }
 
   QualType FnRetType;
   QualType RelatedRetType;
@@ -3932,8 +3936,9 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
       RelatedRetType = Context.getObjCInterfaceType(MD->getClassInterface());
       RelatedRetType = Context.getObjCObjectPointerType(RelatedRetType);
     }
-  } else // If we don't have a function/method context, bail.
+  } else { // If we don't have a function/method context, bail.
     return StmtError();
+  }
 
   if (RetValExp) {
     const auto *ATy = dyn_cast<ArrayType>(RetValExp->getType());
@@ -3962,7 +3967,7 @@ StmtResult Sema::BuildReturnStmt(SourceLocation ReturnLoc, Expr *RetValExp,
   // deduction.
   if (getLangOpts().CPlusPlus14) {
     if (AutoType *AT = FnRetType->getContainedAutoType()) {
-      FunctionDecl *FD = cast<FunctionDecl>(CurContext);
+      FunctionDecl *FD = getCurFunctionDecl(/*AllowLambda=*/true);
       // If we've already decided this function is invalid, e.g. because
       // we saw a `return` whose expression had an error, don't keep
       // trying to deduce its return type.

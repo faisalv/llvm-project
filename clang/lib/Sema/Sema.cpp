@@ -1553,7 +1553,7 @@ DeclContext *Sema::getFunctionLevelDeclContext(bool AllowLambda) const {
 
   while (true) {
     if (isa<BlockDecl>(DC) || isa<EnumDecl>(DC) || isa<CapturedDecl>(DC) ||
-        isa<RequiresExprBodyDecl>(DC)) {
+        isa<RequiresExprBodyDecl>(DC) || isa<ExpansionStmtDecl>(DC)) {
       DC = DC->getParent();
     } else if (!AllowLambda && isa<CXXMethodDecl>(DC) &&
                cast<CXXMethodDecl>(DC)->getOverloadedOperator() == OO_Call &&

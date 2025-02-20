@@ -1205,13 +1205,7 @@ public:
   /// includes variables inside blocks.
   ///
   ///   void foo() { int x; static int y; extern int z; }
-  bool isLocalVarDecl() const {
-    if (getKind() != Decl::Var && getKind() != Decl::Decomposition)
-      return false;
-    if (const DeclContext *DC = getLexicalDeclContext())
-      return DC->getRedeclContext()->isFunctionOrMethod();
-    return false;
-  }
+  bool isLocalVarDecl() const;
 
   /// Similar to isLocalVarDecl but also includes parameters.
   bool isLocalVarDeclOrParm() const {

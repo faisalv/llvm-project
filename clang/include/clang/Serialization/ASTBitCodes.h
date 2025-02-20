@@ -1448,6 +1448,9 @@ enum DeclCode {
   /// \brief A ConstevalBlockDecl record.
   DECL_CONSTEVAL_BLOCK,
 
+  /// \brief An expansion statement record.
+  DECL_EXPANSION_STMT,
+
   /// A record containing CXXBaseSpecifiers.
   DECL_CXX_BASE_SPECIFIERS,
 
@@ -2022,10 +2025,12 @@ enum StmtCode {
   EXPR_EXTRACT_LVALUE,
 
   // C++2c expansion statements (P1306)
+  STMT_INDETERMINATE_EXPANSION,
+  STMT_ITERABLE_EXPANSION,
   STMT_DESTRUCTURABLE_EXPANSION,
   STMT_INIT_LIST_EXPANSION,
-  EXPR_EXPANSION_INIT_LIST,
   EXPR_EXPANSION_SELECT,
+  EXPR_EXPANSION_INIT_LIST,
 
   // FixedPointLiteral
   EXPR_FIXEDPOINT_LITERAL,

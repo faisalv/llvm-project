@@ -507,6 +507,7 @@ namespace clang {
     ExpectedDecl VisitAccessSpecDecl(AccessSpecDecl *D);
     ExpectedDecl VisitStaticAssertDecl(StaticAssertDecl *D);
     ExpectedDecl VisitConstevalBlockDecl(ConstevalBlockDecl *D);
+    ExpectedDecl VisitExpansionStmtDecl(ExpansionStmtDecl *D);
     ExpectedDecl VisitTranslationUnitDecl(TranslationUnitDecl *D);
     ExpectedDecl VisitBindingDecl(BindingDecl *D);
     ExpectedDecl VisitNamespaceDecl(NamespaceDecl *D);
@@ -2653,8 +2654,32 @@ ExpectedDecl ASTNodeImporter::VisitConstevalBlockDecl(ConstevalBlockDecl *D) {
     return std::move(Err);
 
   ConstevalBlockDecl *ToD;
-  if (GetImportedOrCreateDecl(
-      ToD, D, Importer.getToContext(), DC, ToLocation, ToEvaluatingExpr))
+  if (GetImportedOrCreateDecl(ToD, D, Importer.getToContext(), DC, ToLocation,
+                              ToEvaluatingExpr))
+    return ToD;
+
+  ToD->setLexicalDeclContext(LexicalDC);
+  LexicalDC->addDeclInternal(ToD);
+  return ToD;
+}
+
+ExpectedDecl ASTNodeImporter::VisitExpansionStmtDecl(ExpansionStmtDecl *D) {
+  auto DCOrErr = Importer.ImportContext(D->getDeclContext());
+  if (!DCOrErr)
+    return DCOrErr.takeError();
+  DeclContext *DC = *DCOrErr;
+  DeclContext *LexicalDC = DC;
+
+  Error Err = Error::success();
+  auto ToLocation = importChecked(Err, D->getLocation());
+  auto ToExpansion = importChecked(Err, D->getStmt());
+  auto ToTemplateParameters = importChecked(Err, D->getTemplateParameters());
+  if (Err)
+    return std::move(Err);
+
+  ExpansionStmtDecl *ToD;
+  if (GetImportedOrCreateDecl(ToD, D, Importer.getToContext(), DC, ToLocation,
+                              ToExpansion, ToTemplateParameters))
     return ToD;
 
   ToD->setLexicalDeclContext(LexicalDC);

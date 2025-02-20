@@ -10,7 +10,8 @@
 
 // UNSUPPORTED: c++03 || c++11 || c++14 || c++17 || c++20
 // ADDITIONAL_COMPILE_FLAGS: -fblocks
-// ADDITIONAL_COMPILE_FLAGS: -freflection
+// ADDITIONAL_COMPILE_FLAGS: -freflection -faccess-contexts
+// ADDITIONAL_COMPILE_FLAGS: -fexpansion-statements
 // ADDITIONAL_COMPILE_FLAGS: -Wno-inconsistent-missing-override
 
 // <experimental/reflection>
@@ -34,13 +35,15 @@
                         // ============================
 
 namespace alexandrescu_lambda_to_tuple {
+using std::meta::access_context;
+
 consteval auto struct_to_tuple_type(std::meta::info type) -> std::meta::info {
   constexpr auto remove_cvref = [](std::meta::info r) consteval {
     return substitute(^^std::remove_cvref_t, {r});
   };
 
   return substitute(^^std::tuple,
-                    nonstatic_data_members_of(type)
+                    nonstatic_data_members_of(type, access_context::unchecked())
                     | std::views::transform(std::meta::type_of)
                     | std::views::transform(remove_cvref)
                     | std::ranges::to<std::vector>());
@@ -56,7 +59,8 @@ consteval auto get_struct_to_tuple_helper() {
   using To = [: struct_to_tuple_type(^^From) :];
 
   std::vector args = {^^To, ^^From};
-  for (auto mem : nonstatic_data_members_of(^^From)) {
+  for (auto mem : nonstatic_data_members_of(^^From,
+                                            access_context::unchecked())) {
     args.push_back(reflect_value(mem));
   }
 
@@ -117,51 +121,34 @@ void run_test() {
                            // =======================
 
 namespace alisdair_universal_swap {
-namespace __impl {
-template<auto... vals>
-struct replicator_type {
-  template<typename F>
-  constexpr void operator>>(F body) const {
-    (body.template operator()<vals>(), ...);
-  }
-};
-
-template<auto... vals>
-replicator_type<vals...> replicator = {};
-
-} // namespace __impl
-
-template<typename R>
-consteval auto expand(R range) {
-  std::vector<std::meta::info> args;
-  for (auto r : range) {
-    args.push_back(std::meta::reflect_value(r));
-  }
-  return substitute(^^__impl::replicator, args);
-}
-
 template <typename T>
 void do_swap_representations(T& lhs, T& rhs) {
   // This implementation cannot rebind references, and does not handle const
   // data members --- still need to decide whether we support the latter
   if constexpr (std::is_class_v<T>) {
     // This implementation ensures that empty types do nothing
-    [: expand(bases_of(^^T)) :] >> [&]<auto base> {
+    template for (constexpr auto base :
+                  define_static_array(
+                      bases_of(^^T, std::meta::access_context::unchecked()))) {
       using Base = [:type_of(base):];
       do_swap_representations<Base>((Base &)lhs, (Base &)rhs);
-    };
-    [: expand(nonstatic_data_members_of(^^T)) :] >> [&]<auto mem>{
+    }
+    template for (constexpr auto mem :
+                  define_static_array(
+                      nonstatic_data_members_of(
+                          ^^T, std::meta::access_context::unchecked()))) {
       do_swap_representations<[:type_of(mem):]>(lhs.[:mem:], rhs.[:mem:]);
-    };
+    }
   } else if constexpr (std::is_array_v<T>) {
     static_assert(0 < std::rank_v<T>, "cannot swap arrays of unknown bound");
     using MemT = std::decay_t<decltype(lhs[0])>;
-    [:expand([] {
+    template for (constexpr auto Idx :
+                  define_static_array([] {
       std::vector<size_t> result;
       for (size_t idx = 0; idx < std::size(result); ++idx)
         result.push_back(idx);
       return result;
-    }()):] >> [&]<size_t Idx> {
+    }())) {
       do_swap_representations<MemT>(lhs[Idx], rhs[Idx]);
     };
   } else if constexpr (std::is_scalar_v<T> or std::is_union_v<T>) {

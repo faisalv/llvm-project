@@ -1671,6 +1671,12 @@ DEF_TRAVERSE_DECL(ConstevalBlockDecl, {
   TRY_TO(TraverseStmt(D->getEvaluatingExpr()));
 })
 
+DEF_TRAVERSE_DECL(ExpansionStmtDecl, {
+  if (D->getStmt())
+    TRY_TO(TraverseStmt(D->getStmt()));
+  TRY_TO(TraverseDecl(D->getTemplateParm()));
+})
+
 DEF_TRAVERSE_DECL(TranslationUnitDecl, {
   // Code in an unnamed namespace shows up automatically in
   // decls_begin()/decls_end().  Thus we don't need to recurse on
@@ -3018,15 +3024,21 @@ DEF_TRAVERSE_STMT(CXXExpansionInitListExpr, {
   for (Expr *SubExpr : S->getSubExprs())
     TRY_TO(TraverseStmt(SubExpr));
 })
-DEF_TRAVERSE_STMT(CXXExpansionInitListSelectExpr, {
-  TRY_TO(TraverseStmt(S->getRange()));
-  TRY_TO(TraverseStmt(S->getIdx()));
+DEF_TRAVERSE_STMT(CXXIndeterminateExpansionSelectExpr, {
+  TRY_TO(TraverseStmt(S->getRangeExpr()));
+  TRY_TO(TraverseStmt(S->getIdxExpr()));
+})
+DEF_TRAVERSE_STMT(CXXIterableExpansionSelectExpr, {
+  TRY_TO(TraverseDecl(S->getRangeVar()));
+  TRY_TO(TraverseStmt(S->getImplExpr()));
 })
 DEF_TRAVERSE_STMT(CXXDestructurableExpansionSelectExpr, {
-  TRY_TO(TraverseStmt(S->getRange()));
-  if (auto *DD = S->getDecompositionDecl())
-    TRY_TO(TraverseDecl(DD));
-  TRY_TO(TraverseStmt(S->getIdx()));
+  TRY_TO(TraverseDecl(S->getDecompositionDecl()));
+  TRY_TO(TraverseStmt(S->getIdxExpr()));
+})
+DEF_TRAVERSE_STMT(CXXExpansionInitListSelectExpr, {
+  TRY_TO(TraverseStmt(S->getRangeExpr()));
+  TRY_TO(TraverseStmt(S->getIdxExpr()));
 })
 DEF_TRAVERSE_STMT(StackLocationExpr, {})
 DEF_TRAVERSE_STMT(ExtractLValueExpr, {
@@ -3076,12 +3088,29 @@ DEF_TRAVERSE_STMT(CoyieldExpr, {
 })
 
 // C++ expansion statements (P1306).
+DEF_TRAVERSE_STMT(CXXIndeterminateExpansionStmt, {
+  if (!getDerived().shouldVisitImplicitCode()) {
+    if (S->getInit())
+      TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getInit());
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getExpansionVarStmt());
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getBody());
+    ShouldVisitChildren = false;
+  }
+})
 DEF_TRAVERSE_STMT(CXXDestructurableExpansionStmt, {
   if (!getDerived().shouldVisitImplicitCode()) {
     if (S->getInit())
       TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getInit());
     TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getExpansionVarStmt());
-    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getRange());
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getBody());
+    ShouldVisitChildren = false;
+  }
+})
+DEF_TRAVERSE_STMT(CXXIterableExpansionStmt, {
+  if (!getDerived().shouldVisitImplicitCode()) {
+    if (S->getInit())
+      TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getInit());
+    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getExpansionVarStmt());
     TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getBody());
     ShouldVisitChildren = false;
   }
@@ -3091,7 +3120,6 @@ DEF_TRAVERSE_STMT(CXXInitListExpansionStmt, {
     if (S->getInit())
       TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getInit());
     TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getExpansionVarStmt());
-    TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getRange());
     TRY_TO_TRAVERSE_OR_ENQUEUE_STMT(S->getBody());
     ShouldVisitChildren = false;
   }

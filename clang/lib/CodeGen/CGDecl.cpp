@@ -141,6 +141,10 @@ void CodeGenFunction::EmitDecl(const Decl &D) {
     // None of these decls require codegen support.
     return;
 
+  case Decl::ExpansionStmt:  // template for { }
+    EmitStmt(cast<ExpansionStmtDecl>(D).getStmt());
+    return;
+
   case Decl::NamespaceAlias:
     if (CGDebugInfo *DI = getDebugInfo())
         DI->EmitNamespaceAlias(cast<NamespaceAliasDecl>(D));

@@ -2534,11 +2534,22 @@ Parser::DeclGroupPtrTy Parser::ParseDeclGroup(ParsingDeclSpec &DS,
 
       if (getLangOpts().OpenMP)
         Actions.OpenMP().startOpenMPCXXRangeFor();
-      if (Tok.is(tok::l_brace))
-        FRI->RangeExpr = FRI->ExpansionStmt ? ParseExpansionInitList() :
-                                              ParseBraceInitializer();
-      else
-        FRI->RangeExpr = ParseExpression();
+
+      {
+        DeclContext *DC = Actions.CurContext;
+        while (isa<ExpansionStmtDecl>(DC))
+          DC = DC->getParent();
+        Sema::ContextRAII CtxGuard(Actions, DC, /*NewThis=*/false);
+
+        if (Tok.is(tok::l_brace))
+          FRI->RangeExpr = FRI->ExpansionStmt ? ParseExpansionInitList() :
+                                                ParseBraceInitializer();
+        else
+          FRI->RangeExpr = ParseExpression();
+
+        if (FRI->ExpansionStmt)
+          FRI->RangeExpr = Actions.MaybeCreateExprWithCleanups(FRI->RangeExpr);
+      }
 
       // Before c++23, ForRangeLifetimeExtendTemps should be empty.
       assert(

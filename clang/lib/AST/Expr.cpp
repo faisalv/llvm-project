@@ -3667,8 +3667,10 @@ bool Expr::HasSideEffects(const ASTContext &Ctx,
   case StackLocationExprClass:
   case ExtractLValueExprClass:
   case CXXExpansionInitListExprClass:
-  case CXXExpansionInitListSelectExprClass:
+  case CXXIndeterminateExpansionSelectExprClass:
+  case CXXIterableExpansionSelectExprClass:
   case CXXDestructurableExpansionSelectExprClass:
+  case CXXExpansionInitListSelectExprClass:
   case SYCLUniqueStableNameExprClass:
   case PackIndexingExprClass:
   case HLSLOutArgExprClass:
