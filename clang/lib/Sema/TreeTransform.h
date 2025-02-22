@@ -15822,7 +15822,10 @@ TreeTransform<Derived>::TransformLambdaExpr(LambdaExpr *E) {
   while (DC->isRequiresExprBody())
     DC = DC->getParent();
   if ((getSema().isUnevaluatedContext() ||
-       getSema().isConstantEvaluatedContext()) &&
+       (getSema().isConstantEvaluatedContext() &&
+        (!getSema().currentEvaluationContext().ManglingContextDecl ||
+         !isa<VarDecl>(
+            getSema().currentEvaluationContext().ManglingContextDecl)))) &&
       (DC->isFileContext() || !DC->getParent()->isDependentContext()))
     DependencyKind = CXXRecordDecl::LDK_NeverDependent;
 
