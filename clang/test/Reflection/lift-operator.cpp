@@ -151,6 +151,21 @@ static_assert(^^S const == ^^const S);
 static_assert(^^S volatile == ^^volatile S);
 }  // namespace east_west_cv
 
+                               // ==============
+                               // self_reference
+                               // ==============
+
+namespace self_reference {
+struct S {
+  consteval S() {}
+
+  decltype(^^::) k = ^^S::k;
+};
+
+consteval int fn(decltype(^^::) x = ^^x) { return 0; }
+constexpr int x = fn();
+}  // namspace self_reference
+
                    // =======================================
                    // bb_clang_p2996_issue_35_regression_test
                    // =======================================

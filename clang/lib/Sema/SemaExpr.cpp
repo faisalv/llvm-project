@@ -5445,6 +5445,12 @@ struct ImmediateCallVisitor : DynamicRecursiveASTVisitor {
   bool VisitCXXDefaultInitExpr(CXXDefaultInitExpr *E) override {
     return TraverseStmt(E->getExpr());
   }
+
+  bool TraverseCXXReflectExpr(CXXReflectExpr *E) override {
+    if (E->hasDependentSubExpr())
+      return DynamicRecursiveASTVisitor::TraverseCXXReflectExpr(E);
+    return true;
+  }
 };
 
 struct EnsureImmediateInvocationInDefaultArgs
