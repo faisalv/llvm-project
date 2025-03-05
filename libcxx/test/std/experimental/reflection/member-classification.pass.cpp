@@ -854,15 +854,17 @@ namespace member_initializers {
 struct S {
   int a;
   int b = 3;
+  bool c = has_default_member_initializer(^^c);
 };
 
 static_assert(
     (nonstatic_data_members_of(^^S) |
         std::views::transform(std::meta::has_default_member_initializer) |
-        std::ranges::to<std::vector>()) == std::vector {false, true});
+        std::ranges::to<std::vector>()) == std::vector {false, true, true});
 
 static_assert(!has_default_member_initializer(^^int));
 static_assert(!has_default_member_initializer(^^::));
+static_assert(S{}.c);
 }  // namespace member_initializers
 
                              // ==================
