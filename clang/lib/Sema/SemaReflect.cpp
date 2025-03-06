@@ -1079,6 +1079,9 @@ ParsedTemplateArgument Sema::ActOnTemplateSpliceSpecifierArgument(
     Diag(Splice->getExprLoc(), diag::err_unsupported_splice_kind)
       << "data member specs" << 0 << 0;
     break;
+  case ReflectionKind::Annotation:
+    Diag(Splice->getExprLoc(), diag::err_unsupported_splice_kind)
+      << "annotations" << 0 << 0;
   }
   return ParsedTemplateArgument();
 }
@@ -1449,7 +1452,7 @@ ExprResult Sema::BuildReflectionSpliceExpr(
     Expr::EvalResult ER;
     ER.Diag = &Diags;
 
-    if (!Operand->EvaluateAsRValue(ER, Context, true)) {
+    if (!Operand->EvaluateAsConstantExpr(ER, Context)) {
       Diag(Operand->getExprLoc(), diag::err_splice_operand_not_constexpr);
       for (PartialDiagnosticAt PD : Diags)
         Diag(PD.first, PD.second);
@@ -1586,18 +1589,9 @@ ExprResult Sema::BuildReflectionSpliceExpr(
         return ExprError();
       }
 
-      CXXRecordDecl *NamingCls = nullptr;
-      NestedNameSpecifierLocBuilder NNSLocBuilder;
-      if (auto *RD = dyn_cast<CXXRecordDecl>(TDecl->getDeclContext())) {
-        TypeSourceInfo *TSI = Context.getTrivialTypeSourceInfo(
-                QualType(RD->getTypeForDecl(), 0), Operand->getExprLoc());
-        NNSLocBuilder.Extend(Context, SourceLocation(),
-                             TSI->getTypeLoc(), Operand->getExprLoc());
-      }
-
       UnresolvedSet<1> DeclSet;
       DeclSet.addDecl(TDecl);
-      Operand = UnresolvedLookupExpr::Create(Context, NamingCls,
+      Operand = UnresolvedLookupExpr::Create(Context, nullptr,
                                              SS.getWithLocInContext(Context),
                                              SourceLocation(), DeclNameInfo,
                                              false, TArgs, DeclSet.begin(),

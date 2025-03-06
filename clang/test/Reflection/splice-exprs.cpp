@@ -62,13 +62,22 @@ static_assert(fn() == 33);
 
 namespace with_functions {
 consteval int vanilla_fn() { return 42; }
+consteval int with_default_arg(int a = 5) { return a; }
 
 constexpr info r_vanilla_fn = ^^vanilla_fn;
+constexpr info r_with_default_arg = ^^with_default_arg;
 static_assert([:r_vanilla_fn:]() == 42);
+static_assert([:r_with_default_arg:]() == 5);
+static_assert([:r_with_default_arg:](11) == 11);
 
 // With a dependent reflection.
 template <info R> consteval int fn() { return [:R:](); }
 static_assert(fn<r_vanilla_fn>() == 42);
+static_assert(fn<r_with_default_arg>() == 5);
+
+void runtime() {
+    (void) [:^^runtime:];
+}
 }  // namespace with_functions
 
                         // ============================

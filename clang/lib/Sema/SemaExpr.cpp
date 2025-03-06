@@ -6586,7 +6586,7 @@ ExprResult Sema::BuildCallExpr(Scope *Scope, Expr *Fn, SourceLocation LParenLoc,
     Fn = result.get();
   }
 
-  Expr *NakedFn = Fn->IgnoreParens();
+  Expr *NakedFn = Fn->IgnoreParens()->IgnoreSplices();
 
   bool CallingNDeclIndirectly = false;
   NamedDecl *NDecl = nullptr;
