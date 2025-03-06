@@ -2071,16 +2071,48 @@ static void handleAttrWithMessage(Sema &S, Decl *D, const ParsedAttr &AL) {
 /// Handle an annotation (C++2c).
 static void handleCXX2CAnnotation(Sema &S, Decl *D, const ParsedAttr &AL) {
   Expr *CE = AL.getArgAsExpr(0);
+  if (CE->isLValue()) {
+    if (CE->getType()->isRecordType()) {
+      InitializedEntity Entity =
+          InitializedEntity::InitializeTemporary(
+              CE->getType().getUnqualifiedType());
+      InitializationKind Kind =
+          InitializationKind::CreateCopy(CE->getExprLoc(), SourceLocation());
+      InitializationSequence Seq(S, Entity, Kind, CE);
+
+      ExprResult CopyResult = Seq.Perform(S, Entity, Kind, CE);
+      if (CopyResult.isInvalid())
+        return;
+
+      CE = CopyResult.get();
+    } else {
+      ExprResult RVExprResult = S.DefaultLvalueConversion(AL.getArgAsExpr(0));
+      assert(!RVExprResult.isInvalid() && RVExprResult.get());
+
+      CE = RVExprResult.get();
+    }
+  }
 
   Expr::EvalResult Result;
+
+  SmallVector<PartialDiagnosticAt, 4> Notes;
+  Result.Diag = &Notes;
+
   if (!CE->isValueDependent()) {
-    if (!CE->EvaluateAsRValue(Result, S.Context, true)) {
+    ConstantExprKind CEKind = (CE->getType()->isClassType() ?
+                               ConstantExprKind::ClassTemplateArgument :
+                               ConstantExprKind::NonClassTemplateArgument);
+
+    if (!CE->EvaluateAsConstantExpr(Result, S.Context, CEKind)) {
       S.Diag(CE->getBeginLoc(), diag::err_attribute_argument_type)
-          << "c++26 annotation" << 4 << CE->getSourceRange();
+          << "C++26 annotation" << 4 << CE->getSourceRange();
+      for (auto P : Notes)
+        S.Diag(P.first, P.second);
+
       return;
     } else if (!CE->getType()->isStructuralType()) {
       S.Diag(CE->getBeginLoc(), diag::err_attribute_argument_type)
-          << "c++26 annotation" << 5 << CE->getSourceRange();
+          << "C++26 annotation" << 5 << CE->getSourceRange();
       return;
     }
   }
