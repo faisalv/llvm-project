@@ -363,62 +363,62 @@ static_assert(is_public(bases_of(^^D2<B1, B3>,
 
 namespace enumerators {
 enum class EnumCls;
-static_assert(!has_complete_definition(^^EnumCls));
+static_assert(!is_enumerable_type(^^EnumCls));
 
 enum class EnumCls {
     A,
-    B = has_complete_definition(^^EnumCls) ? 1 : 0,
+    B = is_enumerable_type(^^EnumCls) ? 1 : 0,
     C,
 };
 static_assert(int(EnumCls::B) == 0);
-static_assert(has_complete_definition(^^EnumCls));
+static_assert(is_enumerable_type(^^EnumCls));
 static_assert(enumerators_of(^^EnumCls) ==
               std::vector{^^EnumCls::A, ^^EnumCls::B, ^^EnumCls::C});
 
 struct Cls { enum Enum { A, B, C }; };
-static_assert(!has_complete_definition(^^::));
-static_assert(has_complete_definition(^^Cls::Enum));
+static_assert(!is_enumerable_type(^^::));
+static_assert(is_enumerable_type(^^Cls::Enum));
 static_assert(enumerators_of(^^Cls::Enum) ==
               std::vector{^^Cls::A, ^^Cls::B, ^^Cls::C});
 
 }  // namespace enumerators
 
-                            // ====================
-                            // complete_definitions
-                            // ====================
+                              // ================
+                              // enumerable_types
+                              // ================
 
-namespace complete_definitions {
+namespace enumerable_types {
 enum E : int;
-static_assert(!has_complete_definition(^^E));
+static_assert(!is_enumerable_type(^^E));
 
-enum E : int { A = has_complete_definition(^^E) ? 1 : 0 };
+enum E : int { A = is_enumerable_type(^^E) ? 1 : 0 };
 static_assert(E::A == 0);
-static_assert(has_complete_definition(^^E));
+static_assert(is_enumerable_type(^^E));
 
 struct S;
-static_assert(!has_complete_definition(^^S));
+static_assert(!is_enumerable_type(^^S));
 
 struct S {
   void fn() {
-    static_assert(has_complete_definition(^^S));
+    static_assert(is_enumerable_type(^^S));
   }
-  static_assert(!has_complete_definition(^^S));
+  static_assert(!is_enumerable_type(^^S));
 };
-static_assert(has_complete_definition(^^S));
+static_assert(is_enumerable_type(^^S));
 
 void fn();
-static_assert(!has_complete_definition(^^fn));
+static_assert(!is_enumerable_type(^^fn));
 
 void fn() {
-  static_assert(!has_complete_definition(^^fn));
+  static_assert(!is_enumerable_type(^^fn));
 }
-static_assert(has_complete_definition(^^fn));
+static_assert(!is_enumerable_type(^^fn));
 
-static_assert(!has_complete_definition(^^::));
-static_assert(!has_complete_definition(^^int));
-static_assert(!has_complete_definition(^^std::vector));
+static_assert(!is_enumerable_type(^^::));
+static_assert(!is_enumerable_type(^^int));
+static_assert(!is_enumerable_type(^^std::vector));
 
-}  // namespace complete_definitions
+}  // namespace enumrable_types
 
                             // ====================
                             // deduced_return_types

@@ -377,6 +377,12 @@ static bool has_complete_definition(APValue &Result, ASTContext &C,
                                     ArrayRef<Expr *> Args,
                                     Decl *ContainingDecl);
 
+static bool is_enumerable_type(APValue &Result, ASTContext &C,
+                               MetaActions &Meta, EvalFn Evaluator,
+                               DiagFn Diagnoser, bool AllowInjection,
+                               QualType ResultTy, SourceRange Range,
+                               ArrayRef<Expr *> Args, Decl *ContainingDecl);
+
 static bool is_template(APValue &Result, ASTContext &C, MetaActions &Meta,
                         EvalFn Evaluator, DiagFn Diagnoser, bool AllowInjection,
                         QualType ResultTy, SourceRange Range,
@@ -772,6 +778,7 @@ static constexpr Metafunction Metafunctions[] = {
   { Metafunction::MFRK_bool, 1, 1, is_alias },
   { Metafunction::MFRK_bool, 1, 1, is_complete_type },
   { Metafunction::MFRK_bool, 1, 1, has_complete_definition },
+  { Metafunction::MFRK_bool, 1, 1, is_enumerable_type },
   { Metafunction::MFRK_bool, 1, 1, is_template },
   { Metafunction::MFRK_bool, 1, 1, is_function_template },
   { Metafunction::MFRK_bool, 1, 1, is_variable_template },
@@ -2252,22 +2259,12 @@ bool type_of(APValue &Result, ASTContext &C, MetaActions &Meta,
 
   switch (RV.getReflectionKind()) {
   case ReflectionKind::Null:
-  case ReflectionKind::Type: {
-    QualType QT = desugarType(RV.getTypeOfReflectedResult(C), 
-                              /*UnwrapAliases=*/ true, /*DropCV=*/false,
-                              /*DropRefs=*/false);
-    return SetAndSucceed(Result, makeReflection(QT));
-  }
+  case ReflectionKind::Type:
   case ReflectionKind::Template:
   case ReflectionKind::Namespace:
     return Diagnoser(Range.getBegin(), diag::metafn_no_associated_property)
         << DescriptionOf(RV) << 0 << Range;
-  case ReflectionKind::Object: {
-    QualType QT = desugarType(RV.getTypeOfReflectedResult(C),
-                              /*UnwrapAliases=*/ true, /*DropCV=*/false,
-                              /*DropRefs=*/false);
-    return SetAndSucceed(Result, makeReflection(QT));
-  }
+  case ReflectionKind::Object:
   case ReflectionKind::Value: {
     QualType QT = desugarType(RV.getTypeOfReflectedResult(C),
                               /*UnwrapAliases=*/true, /*DropCV=*/false,
@@ -3959,6 +3956,41 @@ bool has_complete_definition(APValue &Result, ASTContext &C, MetaActions &Meta,
   case ReflectionKind::Null:
   case ReflectionKind::Object:
   case ReflectionKind::Value:
+  case ReflectionKind::Template:
+  case ReflectionKind::Namespace:
+  case ReflectionKind::BaseSpecifier:
+  case ReflectionKind::DataMemberSpec:
+  case ReflectionKind::Annotation:
+    break;
+  }
+
+  return SetAndSucceed(Result, makeBool(C, result));
+}
+
+bool is_enumerable_type(APValue &Result, ASTContext &C, MetaActions &Meta,
+                        EvalFn Evaluator, DiagFn Diagnoser, bool AllowInjection,
+                        QualType ResultTy, SourceRange Range,
+                        ArrayRef<Expr *> Args, Decl *ContainingDecl) {
+  assert(Args[0]->getType()->isReflectionType());
+  assert(ResultTy == C.BoolTy);
+
+  APValue RV;
+  if (!Evaluator(RV, Args[0], true))
+    return true;
+
+  bool result = false;
+  switch (RV.getReflectionKind()) {
+  case ReflectionKind::Type:
+    if (Decl *typeDecl = findTypeDecl(RV.getReflectedType())) {
+      if (auto *TD = dyn_cast<TagDecl>(typeDecl))
+        result = (TD->getDefinition() != nullptr &&
+                  !TD->getDefinition()->isBeingDefined());
+    }
+    break;
+  case ReflectionKind::Null:
+  case ReflectionKind::Object:
+  case ReflectionKind::Value:
+  case ReflectionKind::Declaration:
   case ReflectionKind::Template:
   case ReflectionKind::Namespace:
   case ReflectionKind::BaseSpecifier:
