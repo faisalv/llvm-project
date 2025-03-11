@@ -1766,6 +1766,9 @@ bool get_ith_template_argument_of(APValue &Result, ASTContext &C,
                                     "a template specialization");
 
     APValue R = getNthTemplateArgument(C, TArgs, Evaluator, Sentinel, idx);
+    if (R.isReflectedDecl())
+      R = APValue(APValue::LValueBase{R.getReflectedDecl()}, CharUnits::Zero(),
+                  {}, false, false).Lift(QualType{});
     return SetAndSucceed(Result, R);
   }
   case ReflectionKind::Declaration: {
@@ -1773,8 +1776,11 @@ bool get_ith_template_argument_of(APValue &Result, ASTContext &C,
     if (getTemplateArgumentsFromDecl(RV.getReflectedDecl(), TArgs))
       return DiagnoseReflectionKind(Diagnoser, Range,
                                     "a template specialization");
-    return SetAndSucceed(Result, getNthTemplateArgument(C, TArgs, Evaluator,
-                                                        Sentinel, idx));
+    APValue R = getNthTemplateArgument(C, TArgs, Evaluator, Sentinel, idx);
+    if (R.isReflectedDecl())
+      R = APValue(APValue::LValueBase{R.getReflectedDecl()}, CharUnits::Zero(),
+                  {}, false, false).Lift(QualType{});
+    return SetAndSucceed(Result, R);
   }
   case ReflectionKind::Null:
   case ReflectionKind::Template:
@@ -2646,13 +2652,15 @@ static TemplateArgument TArgFromReflection(ASTContext &C, EvalFn Evaluator,
     if (Decl->isInvalidDecl())
       break;
 
+    QualType QT = desugarType(Decl->getType(), /*UnwrapAliases=*/ false,
+                              /*DropCV=*/false, /*DropRefs=*/true);
+
     // Don't worry about the cost of creating an expression here: The template
     // substitution machinery will otherwise create one from the argument
     // anyway, so we aren't really losing any efficiency here.
     Expr *Synthesized =
         DeclRefExpr::Create(C, NestedNameSpecifierLoc(), SourceLocation(), Decl,
-                            false, Loc, Decl->getType(), VK_LValue, Decl,
-                            nullptr);
+                            false, Loc, QT, VK_LValue, Decl, nullptr);
 
     return TemplateArgument(Synthesized);
   }
@@ -2907,7 +2915,7 @@ bool extract(APValue &Result, ASTContext &C, MetaActions &Meta,
       CallOp->setBody(new (C) CompoundStmt(Range.getBegin()));
     }
 
-    APValue CallOpLV(CallOp, CharUnits::Zero(), APValue::NoLValuePath());
+    APValue CallOpLV(CallOp, CharUnits::Zero(), {}, false, false);
     return SetAndSucceed(Out, CallOpLV);
   };
 
@@ -3049,7 +3057,7 @@ bool extract(APValue &Result, ASTContext &C, MetaActions &Meta,
             << 0 << Decl->getType() << ReturnsLValue << ResultTy << Range;
 
       return SetAndSucceed(Result, APValue(Decl, CharUnits::Zero(),
-                           APValue::NoLValuePath()));
+                           {}, false, false));
     }
   }
   case ReflectionKind::Null:

@@ -366,9 +366,9 @@ static_assert(!reflectValueCallable<NonStructuralTypeClass>);
 static_assert(!reflectValueCallable<NonStructuralTypeClass2>);
 }  // namespace reflect_value_callable
 
-// ========================
-// pointer_object_ambiguity
-// ========================
+                          // ========================
+                          // pointer_object_ambiguity
+                          // ========================
 
 namespace pointer_object_ambiguity {
 
@@ -397,6 +397,41 @@ static_assert(rp != ro);
 static_assert(rp != rv);
 static_assert(ro != rv);
 }  // namespace pointer_object_ambiguity
+
+                        // ============================
+                        // library_based_implementation
+                        // ============================
+
+namespace library_based_implementation {
+namespace for_test {
+namespace detail {
+template <auto V> auto value_helper() {
+  return V;
+}
+
+template <auto &O> auto &object_helper() {
+  return O;
+}
+}  // namespace detail
+
+consteval std::meta::info value_of(std::meta::info R) {
+  return template_arguments_of(substitute(^^detail::value_helper, {R}))[0];
+}
+
+consteval std::meta::info object_of(std::meta::info R) {
+  if (is_function(R))
+    throw "not an object";
+  return template_arguments_of(substitute(^^detail::object_helper, {R}))[0];
+}
+}  // namespace for_test
+
+constexpr int i = 3;
+const int &r = i;
+
+static_assert(for_test::value_of(^^i) == std::meta::reflect_value(3));
+static_assert(for_test::object_of(^^r) == std::meta::object_of(^^i));
+
+}  // namespace library_based_implementation
 
                    // =======================================
                    // bb_clang_p2996_issue_67_regression_test
