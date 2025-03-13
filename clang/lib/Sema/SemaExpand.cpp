@@ -247,10 +247,12 @@ ExprResult makeCXXDestructurableExpansionSelectExpr(
     return ExprError();
 
   SmallVector<BindingDecl *, 4> Bindings;
-  for (size_t k = 0; k < Arity; ++k)
+  for (size_t k = 0; k < Arity; ++k) {
+    QualType QT = S.Context.getAutoDeductType();  // TODO: Add ref support.
     Bindings.push_back(BindingDecl::Create(S.Context, S.CurContext,
                                            Range->getBeginLoc(),
-                                           /*IdentifierInfo=*/nullptr));
+                                           /*IdentifierInfo=*/nullptr, QT));
+  }
 
   TypeSourceInfo *TSI = S.Context.getTrivialTypeSourceInfo(Range->getType());
   DecompositionDecl *DD = DecompositionDecl::Create(S.Context, S.CurContext,

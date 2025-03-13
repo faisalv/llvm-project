@@ -273,7 +273,8 @@ bool NestedNameSpecifier::containsErrors() const {
 /// Print this nested name specifier to the given output
 /// stream.
 void NestedNameSpecifier::print(raw_ostream &OS, const PrintingPolicy &Policy,
-                                bool ResolveTemplateArguments) const {
+                                bool ResolveTemplateArguments,
+                                bool PrintFinalScopeResOp) const {
   if (getPrefix())
     getPrefix()->print(OS, Policy);
 
@@ -294,7 +295,8 @@ void NestedNameSpecifier::print(raw_ostream &OS, const PrintingPolicy &Policy,
     break;
 
   case Global:
-    break;
+    OS << "::";
+    return;
 
   case Super:
     OS << "__super";
@@ -365,7 +367,8 @@ void NestedNameSpecifier::print(raw_ostream &OS, const PrintingPolicy &Policy,
   }
   }
 
-  OS << "::";
+  if (PrintFinalScopeResOp)
+    OS << "::";
 }
 
 LLVM_DUMP_METHOD void NestedNameSpecifier::dump(const LangOptions &LO) const {

@@ -365,7 +365,7 @@ enum class TemplateSubstitutionKind : char {
   class LocalInstantiationScope {
   public:
     /// A set of declarations.
-    using DeclArgumentPack = SmallVector<VarDecl *, 4>;
+    using DeclArgumentPack = SmallVector<ValueDecl *, 4>;
 
   private:
     /// Reference to the semantic analysis that is performing
@@ -522,9 +522,6 @@ enum class TemplateSubstitutionKind : char {
     llvm::PointerUnion<Decl *, DeclArgumentPack *> *
     findInstantiationOf(const Decl *D);
 
-    /// Similar to \p findInstantiationOf(), but it wouldn't assert if the
-    /// instantiation was not found within the current instantiation scope. This
-    /// is helpful for on-demand declaration instantiation.
     llvm::PointerUnion<Decl *, DeclArgumentPack *> *
     findInstantiationUnsafe(const Decl *D);
 
@@ -633,7 +630,10 @@ enum class TemplateSubstitutionKind : char {
 #define EMPTY(DERIVED, BASE)
 #define LIFETIMEEXTENDEDTEMPORARY(DERIVED, BASE)
 
-    // Decls which use special-case instantiation code.
+// Decls which never appear inside a template.
+#define OUTLINEDFUNCTION(DERIVED, BASE)
+
+// Decls which use special-case instantiation code.
 #define BLOCK(DERIVED, BASE)
 #define CAPTURED(DERIVED, BASE)
 #define IMPLICITPARAM(DERIVED, BASE)

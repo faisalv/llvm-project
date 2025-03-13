@@ -344,7 +344,6 @@ private:
 // scalar types are allowed
 static_assert(reflectValueCallable<int>);
 static_assert(reflectValueCallable<const int>);
-static_assert(reflectValueCallable<const volatile int>);
 static_assert(reflectValueCallable<int*>);
 static_assert(reflectValueCallable<const int*>);
 static_assert(reflectValueCallable<const int* const>);

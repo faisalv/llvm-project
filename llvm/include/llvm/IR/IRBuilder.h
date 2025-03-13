@@ -102,6 +102,11 @@ public:
   FastMathFlags get(FastMathFlags Default) const {
     return FMF.value_or(Default);
   }
+  /// Intersect the FMF from two instructions.
+  static FMFSource intersect(Value *A, Value *B) {
+    return FMFSource(cast<FPMathOperator>(A)->getFastMathFlags() &
+                     cast<FPMathOperator>(B)->getFastMathFlags());
+  }
 };
 
 /// Common base class shared among various IRBuilders.
@@ -849,12 +854,13 @@ public:
                                 Value *Mask = nullptr);
 
   /// Create a call to Masked Expand Load intrinsic
-  CallInst *CreateMaskedExpandLoad(Type *Ty, Value *Ptr, Value *Mask = nullptr,
+  CallInst *CreateMaskedExpandLoad(Type *Ty, Value *Ptr, MaybeAlign Align,
+                                   Value *Mask = nullptr,
                                    Value *PassThru = nullptr,
                                    const Twine &Name = "");
 
   /// Create a call to Masked Compress Store intrinsic
-  CallInst *CreateMaskedCompressStore(Value *Val, Value *Ptr,
+  CallInst *CreateMaskedCompressStore(Value *Val, Value *Ptr, MaybeAlign Align,
                                       Value *Mask = nullptr);
 
   /// Return an all true boolean vector (mask) with \p NumElts lanes.
@@ -999,23 +1005,27 @@ public:
                             const Twine &Name = "");
 
   /// Create call to the minnum intrinsic.
-  Value *CreateMinNum(Value *LHS, Value *RHS, const Twine &Name = "") {
+  Value *CreateMinNum(Value *LHS, Value *RHS, FMFSource FMFSource = {},
+                      const Twine &Name = "") {
     if (IsFPConstrained) {
       return CreateConstrainedFPUnroundedBinOp(
-          Intrinsic::experimental_constrained_minnum, LHS, RHS, nullptr, Name);
+          Intrinsic::experimental_constrained_minnum, LHS, RHS, FMFSource,
+          Name);
     }
 
-    return CreateBinaryIntrinsic(Intrinsic::minnum, LHS, RHS, nullptr, Name);
+    return CreateBinaryIntrinsic(Intrinsic::minnum, LHS, RHS, FMFSource, Name);
   }
 
   /// Create call to the maxnum intrinsic.
-  Value *CreateMaxNum(Value *LHS, Value *RHS, const Twine &Name = "") {
+  Value *CreateMaxNum(Value *LHS, Value *RHS, FMFSource FMFSource = {},
+                      const Twine &Name = "") {
     if (IsFPConstrained) {
       return CreateConstrainedFPUnroundedBinOp(
-          Intrinsic::experimental_constrained_maxnum, LHS, RHS, nullptr, Name);
+          Intrinsic::experimental_constrained_maxnum, LHS, RHS, FMFSource,
+          Name);
     }
 
-    return CreateBinaryIntrinsic(Intrinsic::maxnum, LHS, RHS, nullptr, Name);
+    return CreateBinaryIntrinsic(Intrinsic::maxnum, LHS, RHS, FMFSource, Name);
   }
 
   /// Create call to the minimum intrinsic.
@@ -2678,6 +2688,10 @@ public:
   CallInst *CreateAlignmentAssumption(const DataLayout &DL, Value *PtrValue,
                                       Value *Alignment,
                                       Value *OffsetValue = nullptr);
+
+  /// Create an assume intrinsic call that represents an dereferencable
+  /// assumption on the provided pointer.
+  CallInst *CreateDereferenceableAssumption(Value *PtrValue, Value *SizeValue);
 };
 
 /// This provides a uniform API for creating instructions and inserting
@@ -2702,11 +2716,16 @@ private:
   InserterTy Inserter;
 
 public:
-  IRBuilder(LLVMContext &C, FolderTy Folder, InserterTy Inserter = InserterTy(),
+  IRBuilder(LLVMContext &C, FolderTy Folder, InserterTy Inserter,
             MDNode *FPMathTag = nullptr,
             ArrayRef<OperandBundleDef> OpBundles = {})
       : IRBuilderBase(C, this->Folder, this->Inserter, FPMathTag, OpBundles),
         Folder(Folder), Inserter(Inserter) {}
+
+  IRBuilder(LLVMContext &C, FolderTy Folder, MDNode *FPMathTag = nullptr,
+            ArrayRef<OperandBundleDef> OpBundles = {})
+      : IRBuilderBase(C, this->Folder, this->Inserter, FPMathTag, OpBundles),
+        Folder(Folder) {}
 
   explicit IRBuilder(LLVMContext &C, MDNode *FPMathTag = nullptr,
                      ArrayRef<OperandBundleDef> OpBundles = {})

@@ -1280,7 +1280,7 @@ static bool ensureDeclared(ASTContext &C, QualType QT, SourceLocation SpecLoc) {
             ClassTemplateSpecializationDecl::Create(
                 C, CTD->getTemplatedDecl()->getTagKind(),
                 CTD->getDeclContext(), SpecLoc, SpecLoc,  CTD,
-                TS->template_arguments(), nullptr);
+                TS->template_arguments(), false, nullptr);
         if (!D)
           return false;
 
@@ -2825,7 +2825,7 @@ bool substitute(APValue &Result, ASTContext &C, MetaActions &Meta,
       TSpecDecl = ClassTemplateSpecializationDecl::Create(
             C, CTD->getTemplatedDecl()->getTagKind(),
             CTD->getDeclContext(), Range.getBegin(), Range.getBegin(),
-            CTD, ExpandedTArgs, nullptr);
+            CTD, ExpandedTArgs, false, nullptr);
       CTD->AddSpecialization(TSpecDecl, InsertPos);
     }
     assert(TSpecDecl);
@@ -5046,7 +5046,7 @@ bool bit_size_of(APValue &Result, ASTContext &C, MetaActions &Meta,
 
     if (const FieldDecl *FD = dyn_cast<const FieldDecl>(VD))
       if (FD->isBitField())
-        Sz = FD->getBitWidthValue(C);
+        Sz = FD->getBitWidthValue();
 
     return SetAndSucceed(Result, APValue(C.MakeIntValue(Sz, C.getSizeType())));
   }

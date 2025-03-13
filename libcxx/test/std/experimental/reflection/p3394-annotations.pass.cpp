@@ -47,7 +47,7 @@ namespace non_dependent {
 struct [[maybe_unused, =3, =3, =4, =2.0f]] S;
 template <typename> struct [[maybe_unused, =5, =5, =6, =3.0f]] TCls {};
 template <typename> [[maybe_unused, =5, =5, =6, =3.0f]] void TFn();
-namespace NS [[maybe_unused, =7, =7, =8, =4.0f]] {}
+namespace [[maybe_unused, =7, =7, =8, =4.0f]] NS {}
 
 static_assert((annotations_of(^^fn) |
                   std::views::transform(std::meta::value_of) |

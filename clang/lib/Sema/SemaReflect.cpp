@@ -184,7 +184,8 @@ public:
         return true;
 
       if (S.InstantiateClassTemplateSpecialization(
-              Range.getBegin(), CTSD, TSK_ExplicitInstantiationDefinition, false))
+              Range.getBegin(), CTSD, TSK_ExplicitInstantiationDefinition, false,
+              false))
         return false;
 
       S.InstantiateClassTemplateSpecializationMembers(
@@ -226,13 +227,12 @@ public:
     populateTemplateArgumentListInfo(TAListInfo, TArgs, InstantiateLoc);
 
     DefaultArguments DefaultArgs;
-    SmallVector<TemplateArgument, 4> CanonicalTArgs;
-    SmallVector<TemplateArgument, 4> IgnoredSugared;
+    Sema::CheckTemplateArgumentInfo CompletedTArgs;
 
     auto check = [&]() {
       return !S.CheckTemplateArgumentList(TD, InstantiateLoc, TAListInfo,
-                                          DefaultArgs, false, IgnoredSugared,
-                                          CanonicalTArgs, true);
+                                          DefaultArgs, false, CompletedTArgs,
+                                          true);
     };
     bool Result;
     if (SuppressDiagnostics) {
@@ -241,7 +241,7 @@ public:
     } else {
       Result = check();
     }
-    TArgs = CanonicalTArgs;
+    TArgs = CompletedTArgs.CanonicalConverted;
     return Result;
   }
 
@@ -344,8 +344,9 @@ public:
 
     FunctionDecl *Spec;
     TemplateDeductionResult Result = S.DeduceTemplateArguments(
-          TD, &TAListInfo, Args, Spec, DeductionInfo, false, true, QualType{},
-          Expr::Classification(), [](ArrayRef<QualType>) { return false; });
+          TD, &TAListInfo, Args, Spec, DeductionInfo, false, true, false,
+          QualType{}, Expr::Classification(),
+          [](ArrayRef<QualType>) { return false; });
     if (Result != TemplateDeductionResult::Success)
       return nullptr;
 
@@ -1552,14 +1553,14 @@ ExprResult Sema::BuildReflectionSpliceExpr(
       }
 
       if (auto *FTD = dyn_cast<FunctionTemplateDecl>(TDecl); FTD && TArgs) {
-        SmallVector<TemplateArgument> Ignored;
+        CheckTemplateArgumentInfo Ignored;
         DefaultArguments DefaultArgs;
 
         bool ConstraintFailure = false;
         if (CheckTemplateArgumentList(
                 FTD, TemplateKWLoc,
                 *const_cast<TemplateArgumentListInfo *>(TArgs), DefaultArgs,
-                true, Ignored, Ignored, false, &ConstraintFailure) ||
+                true, Ignored, false, &ConstraintFailure) ||
             ConstraintFailure)
           return ExprError();
       } else if (auto *VTD = dyn_cast<VarTemplateDecl>(TDecl)) {

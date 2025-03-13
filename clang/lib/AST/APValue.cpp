@@ -313,7 +313,8 @@ APValue::UnionData::~UnionData () {
 }
 
 APValue::APValue(const APValue &RHS)
-    : Kind(None), UnderlyingTy(), ReflectionDepth() {
+    : Kind(None), AllowConstexprUnknown(RHS.AllowConstexprUnknown),
+      UnderlyingTy(), ReflectionDepth() {
   switch (RHS.Kind) {
   case None:
   case Indeterminate:
@@ -392,14 +393,16 @@ APValue::APValue(const APValue &RHS)
 }
 
 APValue::APValue(APValue &&RHS)
-    : Kind(RHS.Kind), Data(RHS.Data),
-      UnderlyingTy(RHS.UnderlyingTy), ReflectionDepth(RHS.ReflectionDepth) {
+    : Kind(RHS.Kind), AllowConstexprUnknown(RHS.AllowConstexprUnknown),
+      Data(RHS.Data), UnderlyingTy(RHS.UnderlyingTy),
+      ReflectionDepth(RHS.ReflectionDepth) {
   RHS.Kind = None;
 }
 
 APValue &APValue::operator=(const APValue &RHS) {
   if (this != &RHS)
     *this = APValue(RHS);
+
   return *this;
 }
 
@@ -409,6 +412,7 @@ APValue &APValue::operator=(APValue &&RHS) {
       DestroyDataAndMakeUninit();
     Kind = RHS.Kind;
     Data = RHS.Data;
+    AllowConstexprUnknown = RHS.AllowConstexprUnknown;
     UnderlyingTy = RHS.UnderlyingTy;
     ReflectionDepth = RHS.ReflectionDepth;
     RHS.Kind = None;
@@ -444,6 +448,7 @@ void APValue::DestroyDataAndMakeUninit() {
   else if (Kind == Reflection)
     ((ReflectionData *)(char *)&Data)->~ReflectionData();
   Kind = None;
+  AllowConstexprUnknown = false;
 }
 
 bool APValue::needsCleanup() const {
@@ -487,6 +492,11 @@ bool APValue::needsCleanup() const {
 void APValue::swap(APValue &RHS) {
   std::swap(Kind, RHS.Kind);
   std::swap(Data, RHS.Data);
+  // We can't use std::swap w/ bit-fields
+  bool tmp = AllowConstexprUnknown;
+  AllowConstexprUnknown = RHS.AllowConstexprUnknown;
+  RHS.AllowConstexprUnknown = tmp;
+
   std::swap(UnderlyingTy, RHS.UnderlyingTy);
   std::swap(ReflectionDepth, RHS.ReflectionDepth);
 }

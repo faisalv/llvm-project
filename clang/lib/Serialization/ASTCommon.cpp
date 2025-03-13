@@ -341,6 +341,7 @@ serialization::getDefinitiveDeclContext(const DeclContext *DC) {
   case Decl::CXXConversion:
   case Decl::ObjCMethod:
   case Decl::Block:
+  case Decl::OutlinedFunction:
   case Decl::Captured:
     // Objective C categories, category implementations, and class
     // implementations can only be defined in one place.
@@ -445,6 +446,7 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::ConstevalBlock:
   case Decl::ExpansionStmt:
   case Decl::Block:
+  case Decl::OutlinedFunction:
   case Decl::Captured:
   case Decl::Import:
   case Decl::OMPThreadPrivate:
@@ -462,6 +464,8 @@ bool serialization::isRedeclarableDeclKind(unsigned Kind) {
   case Decl::RequiresExprBody:
   case Decl::UnresolvedUsingIfExists:
   case Decl::HLSLBuffer:
+  case Decl::OpenACCDeclare:
+  case Decl::OpenACCRoutine:
     return false;
 
   // These indirectly derive from Redeclarable<T> but are not actually
