@@ -3990,9 +3990,11 @@ bool is_enumerable_type(APValue &Result, ASTContext &C, MetaActions &Meta,
   switch (RV.getReflectionKind()) {
   case ReflectionKind::Type:
     if (Decl *typeDecl = findTypeDecl(RV.getReflectedType())) {
-      if (auto *TD = dyn_cast<TagDecl>(typeDecl))
+      if (auto *TD = dyn_cast<TagDecl>(typeDecl)) {
+        (void) Meta.EnsureInstantiated(TD, Range);
         result = (TD->getDefinition() != nullptr &&
                   !TD->getDefinition()->isBeingDefined());
+      }
     }
     break;
   case ReflectionKind::Null:
