@@ -5571,7 +5571,8 @@ bool is_accessible(APValue &Result, ASTContext &C, MetaActions &Meta,
     UnconditionalAccess = true;
     break;
   case ReflectionKind::Type:
-    AccessDC = dyn_cast<DeclContext>(findTypeDecl(Scratch.getReflectedType()));
+    AccessDC = dyn_cast_or_null<DeclContext>(
+        findTypeDecl(Scratch.getReflectedType()));
     if (!AccessDC)
       return true;
     break;
