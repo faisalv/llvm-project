@@ -785,7 +785,8 @@ ExprResult Sema::ActOnCXXReflectExpr(SourceLocation OpLoc,
   if (Found.isAmbiguous()) {
     return ExprError();
   } else if (Found.isOverloadedResult() && Found.end() - Found.begin() > 1) {
-    Diag(Id.StartLocation, diag::err_reflect_overload_set);
+    Diag(Id.StartLocation, diag::err_reflect_overload_set)
+        << Id.getSourceRange();
     return ExprError();
   }
 
@@ -813,6 +814,15 @@ ExprResult Sema::ActOnCXXReflectExpr(SourceLocation OpLoc,
 
   if (isa<NamespaceDecl, NamespaceAliasDecl, TranslationUnitDecl>(ND))
     return BuildCXXReflectExpr(OpLoc, NameInfo.getBeginLoc(), ND);
+
+  if (auto *VD = dyn_cast<VarDecl>(ND);
+      VD && (VD->isInitCapture() ||
+             NeedToCaptureVariable(VD, Id.StartLocation))) {
+    Diag(Id.StartLocation, diag::err_reflect_init_capture)
+        << Id.getSourceRange();
+    return ExprError();
+  }
+
 
   // Why do we have to build an expression here? Just stash in an APValue?
   if (isa<VarDecl, BindingDecl, FunctionDecl, FieldDecl, EnumConstantDecl,
